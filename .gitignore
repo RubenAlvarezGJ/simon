@@ -1,5 +1,6 @@
 .git
 env
+venv
 runs
 src/cv_layer/__pycache__
 main.py
