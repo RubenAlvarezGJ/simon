@@ -3,6 +3,7 @@ import queue
 import threading
 import logging
 from pathlib import Path
+from typing import Self
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +57,10 @@ class VideoReader:
         self._frames_dropped: int = 0
 
     # ------------------------------------------------------------------
-    # Public API
+    # API
     # ------------------------------------------------------------------
 
-    def start(self) -> "VideoReader":
+    def start(self) -> Self:
         """
         Open the video source and launch the background reader thread.
 
