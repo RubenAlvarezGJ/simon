@@ -1,5 +1,5 @@
 import cv2
-from cv_layer.detector.yolo_detector import YOLODetector
+from src.cv_layer.detector.yolo_detector import YOLODetector
 
 class AdaptiveDetector:
     def __init__(self, model_path, inference_interval=3, motion_threshold=500, device="cuda"):

@@ -8,7 +8,7 @@ from typing import Any, Self
 logger = logging.getLogger(__name__)
 
 
-class InferenceEngine:
+class DetectionEngine:
     """
     Pulls frames from an input queue, runs GPU inference via AdaptiveDetector class,
     and pushes (annotated_frame, detections) result tuples onto an output queue on a 
@@ -18,7 +18,7 @@ class InferenceEngine:
     loop (main-thread-bound), so the GPU is never idle waiting on either.
 
     Usage:
-        engine = InferenceEngine(
+        engine = DetectionEngine(
             detector=detector,
             input_queue=frame_queue,
             output_queue=result_queue,
@@ -82,11 +82,11 @@ class InferenceEngine:
         """
         self._thread = threading.Thread(
             target=self._inference_loop,
-            name="InferenceEngine",
+            name="DetectionEngine",
             daemon=True,
         )
         self._thread.start()
-        logger.info("InferenceEngine: inference thread started")
+        logger.info("DetectionEngine: inference thread started")
         return self
 
     def stop(self) -> None:
@@ -100,7 +100,7 @@ class InferenceEngine:
             self._thread.join()
             self._thread = None
         logger.info(
-            "InferenceEngine: stopped.  "
+            "DetectionEngine: stopped.  "
             "frames_processed=%d  frames_skipped=%d  avg_inference_ms=%.1f",
             self._frames_processed,
             self._frames_skipped,
@@ -147,7 +147,7 @@ class InferenceEngine:
 
         The ``None`` sentinel is forwarded downstream before the thread exits.
         """
-        logger.debug("InferenceEngine: inference loop started")
+        logger.debug("DetectionEngine: inference loop started")
 
         # Rolling window of recent frame durations for stable FPS estimation.
         # deque with maxlen automatically evicts the oldest entry.
@@ -163,7 +163,7 @@ class InferenceEngine:
  
             if frame is None:
                 # Sentinal value detected.
-                logger.info("InferenceEngine: end-of-stream sentinel received")
+                logger.info("DetectionEngine: end-of-stream sentinel received")
                 self._forward_sentinel()
                 break
 
@@ -182,7 +182,7 @@ class InferenceEngine:
             self._total_inference_time += inference_time
 
             logger.debug(
-                "InferenceEngine: frame %d  fps=%.1f  inference=%.1fms",
+                "DetectionEngine: frame %d  fps=%.1f  inference=%.1fms",
                 self._frames_processed,
                 fps,
                 inference_time * 1000,
@@ -190,7 +190,7 @@ class InferenceEngine:
 
             self._enqueue_result(annotated_frame, detections)
 
-        logger.debug("InferenceEngine: inference loop exiting")
+        logger.debug("DetectionEngine: inference loop exiting")
 
     def _rolling_fps(self, durations: deque) -> float:
         """
@@ -229,7 +229,7 @@ class InferenceEngine:
         except queue.Full:
             self._frames_skipped += 1
             logger.debug(
-                "InferenceEngine: result dropped (output queue full). "
+                "DetectionEngine: result dropped (output queue full). "
                 "total_skipped=%d",
                 self._frames_skipped,
             )
@@ -242,10 +242,10 @@ class InferenceEngine:
         while not self._stop_event.is_set():
             try:
                 self._output_queue.put(None, block=True, timeout=0.5)
-                logger.debug("InferenceEngine: sentinel forwarded to output queue")
+                logger.debug("DetectionEngine: sentinel forwarded to output queue")
                 return
             except queue.Full:
-                logger.debug("InferenceEngine: waiting to forward sentinel...")
+                logger.debug("DetectionEngine: waiting to forward sentinel...")
 
     # ------------------------------------------------------------------
     # Dunder helpers
@@ -254,7 +254,7 @@ class InferenceEngine:
     def __repr__(self) -> str:
         status = "running" if self.is_alive else "stopped"
         return (
-            f"InferenceEngine(status={status}, "
+            f"DetectionEngine(status={status}, "
             f"frames_processed={self._frames_processed}, "
             f"frames_skipped={self._frames_skipped}, "
             f"avg_inference_ms={self.avg_inference_ms:.1f})"
