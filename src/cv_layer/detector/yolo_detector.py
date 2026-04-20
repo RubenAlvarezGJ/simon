@@ -1,5 +1,6 @@
 from ultralytics import YOLO
 import cv2
+import supervision as sv
 
 class YOLODetector:
     def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.5, device="cuda"):
@@ -15,6 +16,10 @@ class YOLODetector:
         self.confidence_threshold = confidence_threshold
         self.device = device
         self.model.to(device) # move model to gpu
+
+        self.box_annotator = sv.BoxAnnotator()
+        self.label_annotator = sv.LabelAnnotator()
+        self.trace_annotator = sv.TraceAnnotator()
     
     def detect(self, frame):
         """  
@@ -24,51 +29,70 @@ class YOLODetector:
             frame: OpenCV frame (numpy array in BGR format).
 
         Returns:
-            List of dicts, each containing:
-                - class_id (int): Numeric class index.
-                - class_name (str): Human-readable class label.
-                - bbox (list): Bounding box as [x1, y1, x2, y2].
-                - confidence (float): Detection confidence score.
+            sv.Detections object containing all detections above the confidence
+            threshold, with the following key attributes:
+                - xyxy (np.ndarray): Bounding boxes as shape (N, 4) in [x1, y1, x2, y2] format.
+                - class_id (np.ndarray): Numeric class indices, shape (N,).
+                - confidence (np.ndarray): Detection confidence scores, shape (N,).
+                - tracker_id (np.ndarray or None): Track IDs, shape (N,). None until
+                  passed through a tracker such as sv.ByteTrack.
+
+            Returns sv.Detections.empty() if no detections exceed the confidence
+            threshold. Class names can be retrieved via self.model.names[class_id]
         """
         result = self.model(frame, device=self.device)[0]
-        detections = []
 
-        for box in result.boxes:
-            confidence = float(box.conf)
+        # Converts Ultralytics result to Supervision Detections
+        detections = sv.Detections.from_ultralytics(result)
 
-            if confidence < self.confidence_threshold:
-                continue
-
-            class_id = int(box.cls)
-            detections.append({
-                "class_id": class_id,
-                "class_name": self.model.names[class_id],
-                "bbox": box.xyxy[0].tolist(),
-                "confidence": confidence
-            })
+        # Filter confidence threshold
+        detections = detections[detections.confidence >= self.confidence_threshold]
+        
         return detections
 
-    def visualize(self, frame, detections, fps=None):
+    def visualize(self, frame, detections: sv.Detections, fps=None):
         """
-        Draws bounding boxes and labels onto a frame.
+        Draws bounding boxes, tracking labels, and traces onto a frame.
 
         Parameters:
             frame: OpenCV frame to draw on.
-            detections (list): Output from detect().
+            detections (sv.Detections): Output from the tracker/detector.
 
         Returns:
             Annotated frame (numpy array).
         """
-        for det in detections:
-            x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
-            label = f'{det["class_name"]} {det["confidence"]:.2f}'
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, label, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
+        labels = []
+        for class_id, confidence, tracker_id in zip(
+            detections.class_id, 
+            detections.confidence, 
+            detections.tracker_id if detections.tracker_id is not None else [None] * len(detections)
+        ):
+            class_name = self.model.names[class_id]
+            if tracker_id is not None:
+                labels.append(f"#{tracker_id} {class_name} {confidence:.2f}")
+            else:
+                labels.append(f"{class_name} {confidence:.2f}")
+
+        annotated_frame = self.trace_annotator.annotate(
+            scene=frame, detections=detections
+        )
+        annotated_frame = self.box_annotator.annotate(
+            scene=annotated_frame, detections=detections
+        )
+        annotated_frame = self.label_annotator.annotate(
+            scene=annotated_frame, detections=detections, labels=labels
+        )
+
         if fps is not None:
-            cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(
+                annotated_frame, 
+                f"FPS: {fps:.1f}", 
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 
+                1, 
+                (0, 255, 0), 
+                2
+            )
 
-        return frame
+        return annotated_frame

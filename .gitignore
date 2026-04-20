@@ -8,3 +8,5 @@ src/cv_layer/pipeline/__pycache__
 main.py
 test.py
 /videos
+/context
+notes.txt

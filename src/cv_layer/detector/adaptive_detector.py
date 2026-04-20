@@ -1,13 +1,15 @@
 import cv2
+import supervision as sv
 from src.cv_layer.detector.yolo_detector import YOLODetector
 
 class AdaptiveDetector:
     def __init__(self, model_path, inference_interval=3, motion_threshold=500, device="cuda"):
         self.detector = YOLODetector(model_path, device=device)
+        self.tracker = sv.ByteTrack()
         self.inference_interval = inference_interval  # base cadence
         self.motion_threshold = motion_threshold      # pixel diff area to trigger fast inference
         self.frame_count = 0
-        self.last_detections = []
+        self.last_detections = sv.Detections.empty()
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=500, varThreshold=50, detectShadows=False
         )
@@ -39,7 +41,8 @@ class AdaptiveDetector:
                 print("DEBUG: at base cadence -> running inference")
             # --------------------------------------------------------------
 
-            self.last_detections = self.detector.detect(frame)
+            raw_detections = self.detector.detect(frame)
+            self.last_detections = self.tracker.update_with_detections(raw_detections)
 
         # Always visualize using the most recent detections
         annotated = self.detector.visualize(frame.copy(), self.last_detections, fps)
