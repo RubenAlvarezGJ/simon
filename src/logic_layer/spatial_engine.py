@@ -89,7 +89,7 @@ class SpatialEngine:
         zone_count:   Number of valid zones loaded (0 in Bypass Mode).
     """
 
-    def __init__(self, zones_path: str | Path = "config/zones.json") -> None:
+    def __init__(self, zones_path: str | Path = "src/config/zones.json") -> None:
         """
         Initialise the engine and compile all polygon zones.
 

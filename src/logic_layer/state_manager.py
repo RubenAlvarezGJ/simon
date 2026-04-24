@@ -112,6 +112,7 @@ class ThreatState:
     last_seen_at:  float       = field(default_factory=time.monotonic)
     cooldown_start: Optional[float] = None
     alert_fired:   bool        = False
+    active_zones:  list[str]   = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Convenience properties

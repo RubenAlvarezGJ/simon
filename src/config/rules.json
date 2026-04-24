@@ -1,0 +1,30 @@
+{
+    "_readme": "Default Configuration",
+
+    "rules": [
+        {
+        "name": "Critical: Weapon Detected",
+        "description": "Tier 1 lethal weapon detected anywhere on camera.",
+        "cooldown_seconds": 10.0,
+        "conditions": [
+            { "tier": 1 }
+        ]
+        },
+        {
+        "name": "High: Intrusion Tool",
+        "description": "Tier 2 tool (crowbar, bat, bolt cutters) detected.",
+        "cooldown_seconds": 30.0,
+        "conditions": [
+            { "tier": 2 }
+        ]
+        },
+        {
+        "name": "Suspicious: Concealment",
+        "description": "Tier 3 item (ski mask, flashlight) detected.",
+        "cooldown_seconds": 60.0,
+        "conditions": [
+            { "tier": 3 }
+        ]
+        }
+    ]
+}
