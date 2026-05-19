@@ -5,6 +5,7 @@ runs
 
 /videos
 /context
+/scripts
 notes.txt
 pytest.ini
 
