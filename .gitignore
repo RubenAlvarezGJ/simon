@@ -2,6 +2,7 @@
 env
 venv
 runs
+logs
 
 /videos
 /context
@@ -12,9 +13,12 @@ pytest.ini
 src/cv_layer/__pycache__
 src/cv_layer/detector/__pycache__
 src/cv_layer/pipeline/__pycache__
-src/logic_layer/__pycache__
 
+src/logic_layer/__pycache__
 src/logic_layer/tests
+
+src/alert_layer/__pycache__
+src/alert_layer/tests
 
 main.py
 test.py
