@@ -9,7 +9,7 @@ Rule Schema Example:
           "cooldown_seconds": 30.0,
           "conditions": [
             { "class_name": "person", "zone": "porch", "min_confidence": 0.60 },
-            { "tier": 2 }
+            { "is_critical": true }
           ]
         }
       ]
@@ -60,7 +60,7 @@ class TriggeredAlert:
                       bounding boxes from the burst frame buffer.
         threat_snapshots: Serialisable dict representation of each
                       contributing threat (via ``ThreatState.to_dict()``).
-                      Provides the VLM with class labels, tiers, zones, and
+                      Provides the VLM with class labels, zones, and
                       confidence scores without passing live object references
                       across thread boundaries.
         rule_description: The optional ``description`` field from the JSON
@@ -99,13 +99,13 @@ class ConditionSpec:
 
     Attributes:
         class_name:     Exact YOLO class label to match, or ``None``.
-        tier:           Priority tier integer (1/2/3) to match, or ``None``.
+        is_critical:    True/False, or ``None``.
         zone:           Zone name that must appear in ``active_zones``,
                         or ``None`` (any zone including "global" is accepted).
         min_confidence: Minimum confidence threshold, or ``None``.
     """
     class_name:     Optional[str]   = None
-    tier:           Optional[int]   = None
+    is_critical:    Optional[bool]   = None
     zone:           Optional[str]   = None
     min_confidence: Optional[float] = None
 
@@ -139,17 +139,18 @@ class FrameIndex:
     condition to O(1) lookup + O(|candidates|) filter.
 
     Attributes:
-        by_class: Maps class label → list of matching ThreatStates.
-        by_tier:  Maps tier integer → list of matching ThreatStates.
-        by_zone:  Maps zone name → list of matching ThreatStates.
-                  A ThreatState appears under EVERY zone in its
-                  ``active_zones`` list.
-        all:      Unfiltered reference to the full confirmed threat list.
+        by_class:    Maps class label → list of matching ThreatStates.
+        by_critical: Maps critical flag (True/False) → list of matching
+                     ThreatStates.
+        by_zone:     Maps zone name → list of matching ThreatStates.
+                     A ThreatState appears under EVERY zone in its
+                     ``active_zones`` list.
+        all:         Unfiltered reference to the full confirmed threat list.
     """
-    by_class: dict[str, list["ThreatState"]] = field(default_factory=dict)
-    by_tier:  dict[int,  list["ThreatState"]] = field(default_factory=dict)
-    by_zone:  dict[str,  list["ThreatState"]] = field(default_factory=dict)
-    all:      list["ThreatState"]             = field(default_factory=list)
+    by_class:    dict[str,  list["ThreatState"]] = field(default_factory=dict)
+    by_critical: dict[bool, list["ThreatState"]] = field(default_factory=dict)
+    by_zone:     dict[str,  list["ThreatState"]] = field(default_factory=dict)
+    all:         list["ThreatState"]             = field(default_factory=list)
 
 class RuleEvaluator:
     """
@@ -163,8 +164,8 @@ class RuleEvaluator:
         A rule fires when **every** one of its conditions is independently
         satisfied by **at least one** ThreatState in the current frame.
         Multiple conditions may be satisfied by the **same** ThreatState
-        (e.g. a crowbar on the porch satisfies both a tier-2 condition and
-        a zone condition).  The ``tracker_ids`` in the resulting alert is the
+        (e.g. a critical weapon on the porch satisfies both an is_critical
+        condition and a zone condition).  The ``tracker_ids`` in the resulting alert is the
         **union** of all contributing object IDs.
 
     Cooldown model:
@@ -226,7 +227,7 @@ class RuleEvaluator:
             threats: List of confirmed, spatially-tagged ``ThreatState``
                      objects from ``registry.get_confirmed_threats()``.
                      Each object must expose: ``tracker_id``, ``class_name``,
-                     ``tier``, ``confidence``, ``active_zones``, ``to_dict()``.
+                     ``is_critical``, ``confidence``, ``active_zones``, ``to_dict()``.
 
         Returns:
             List of ``TriggeredAlert`` objects for every rule that fired this
@@ -369,9 +370,9 @@ class RuleEvaluator:
 
         Index selection strategy:
             Start from the most selective index available in priority order:
-            ``class_name`` > ``zone`` > ``tier`` > ``all``.  Then apply any
-            remaining field filters as a linear pass over that candidate set.
-            This minimises the number of objects touched per condition.
+            ``class_name`` > ``zone`` > ``is_critical`` > ``all``.  Then apply
+            any remaining field filters as a linear pass over that candidate
+            set.  This minimises the number of objects touched per condition.
 
         Args:
             condition: The compiled condition spec to resolve.
@@ -385,8 +386,8 @@ class RuleEvaluator:
             candidates = index.by_class.get(condition.class_name, [])
         elif condition.zone is not None:
             candidates = index.by_zone.get(condition.zone, [])
-        elif condition.tier is not None:
-            candidates = index.by_tier.get(condition.tier, [])
+        elif condition.is_critical is not None:
+            candidates = index.by_critical.get(condition.is_critical, [])
         else:
             candidates = index.all
 
@@ -398,7 +399,7 @@ class RuleEvaluator:
         for threat in candidates:
             if condition.class_name is not None and threat.class_name != condition.class_name:
                 continue
-            if condition.tier is not None and threat.tier != condition.tier:
+            if condition.is_critical is not None and threat.is_critical != condition.is_critical:
                 continue
             if condition.zone is not None and condition.zone not in threat.active_zones:
                 continue
@@ -430,8 +431,8 @@ class RuleEvaluator:
             # Index by class
             idx.by_class.setdefault(threat.class_name, []).append(threat)
 
-            # Index by tier
-            idx.by_tier.setdefault(threat.tier, []).append(threat)
+            # Index by critical flag
+            idx.by_critical.setdefault(threat.is_critical, []).append(threat)
 
             # Index by every zone the threat currently occupies
             for zone_name in threat.active_zones:
@@ -574,7 +575,7 @@ class RuleEvaluator:
         """
         Validate and compile a single condition dict into a ``ConditionSpec``.
 
-        Valid filter fields: ``class_name`` (str), ``tier`` (int 1-3),
+        Valid filter fields: ``class_name`` (str), ``is_critical`` (bool),
         ``zone`` (str), ``min_confidence`` (float 0.0-1.0).
         At least one field must be present.
 
@@ -593,7 +594,7 @@ class RuleEvaluator:
             return None
 
         class_name     = entry.get("class_name")
-        tier           = entry.get("tier")
+        is_critical    = entry.get("is_critical")
         zone           = entry.get("zone")
         min_confidence = entry.get("min_confidence")
 
@@ -602,10 +603,9 @@ class RuleEvaluator:
             logger.warning("%s - 'class_name' must be a string.", prefix)
             return None
 
-        if tier is not None:
-            if not isinstance(tier, int) or tier not in (1, 2, 3):
-                logger.warning("%s - 'tier' must be an integer: 1, 2, or 3.", prefix)
-                return None
+        if is_critical is not None and not isinstance(is_critical, bool):
+            logger.warning("%s - 'is_critical' must be a boolean.", prefix)
+            return None
 
         if zone is not None and not isinstance(zone, str):
             logger.warning("%s - 'zone' must be a string.", prefix)
@@ -617,17 +617,17 @@ class RuleEvaluator:
                 return None
 
         # Require at least one filter field
-        if all(v is None for v in (class_name, tier, zone, min_confidence)):
+        if all(v is None for v in (class_name, is_critical, zone, min_confidence)):
             logger.warning(
                 "%s - empty condition (no filter fields). "
-                "Use at least one of: class_name, tier, zone, min_confidence.",
+                "Use at least one of: class_name, is_critical, zone, min_confidence.",
                 prefix,
             )
             return None
 
         return ConditionSpec(
             class_name     = class_name,
-            tier           = int(tier) if tier is not None else None,
+            is_critical    = is_critical,
             zone           = zone,
             min_confidence = float(min_confidence) if min_confidence is not None else None,
         )

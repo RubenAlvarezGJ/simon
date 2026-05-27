@@ -20,5 +20,14 @@ src/logic_layer/tests
 src/alert_layer/__pycache__
 src/alert_layer/tests
 
+src/web_layer/__pycache__
+src/web_layer/routes/__pycache__
+src/web_layer/tests/
+
+web/node_modules/
+web/dist/
+src/config/*.bak
+src/config/*.tmp
+
 main.py
 test.py

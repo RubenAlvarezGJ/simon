@@ -21,14 +21,9 @@ class StateManagerConfig:
     """
     Configuration for the ActiveThreats registry.
 
-    Per-tier confirm thresholds allow fast-tracking critical Tier 1 detections
-    (weapons) while requiring more evidence for ambiguous Tier 3 objects.
-
     Args:
-        tier1_confirm_frames:  Consecutive frames required to confirm a Tier 1
-                               (lethal weapon) detection. Low value = fast alert.
-        tier2_confirm_frames:  Consecutive frames for Tier 2 (intrusion tools).
-        tier3_confirm_frames:  Consecutive frames for Tier 3
+        critical_confirm_frames:  Consecutive frames required to confirm a critical
+                                  detection. Low value = fast alert.
         
         cooldown_seconds:      Duration (seconds) a lost ID is retained in
                                COOLDOWN before being purged. Prevents re-alerting
@@ -37,32 +32,18 @@ class StateManagerConfig:
                                directly to CONFIRMED, skipping debounce. Safe
                                to enable when tracker ID stability is high.
     """
-    tier1_confirm_frames: int   = 3
-    tier2_confirm_frames: int   = 5
-    tier3_confirm_frames: int   = 8
-
-    cooldown_seconds:     float = 8.0
-    revive_on_reentry:    bool  = True
+    critical_confirm_frames: int   = 3
+    cooldown_seconds:        float = 8.0
+    revive_on_reentry:       bool  = True
 
 
-# ------------------------------------------------------------------
-# Map: maps class names to tiers
-# ------------------------------------------------------------------
+# ------------------------------------------------------------------------------------
+# Set of critical classes
+# ------------------------------------------------------------------------------------
 
-CLASS_TIER_MAP: dict[str, int] = {
-    # Tier 1 — Lethal Weapons (Critical Priority)
-    "handgun":       1,
-    "long_gun":      1,
-    "knife":         1,
-    # Tier 2 — Intrusion Tools (High Priority)
-    "crowbar":       2,
-    "bolt_cutters":  2,
-    "baseball_bat":  2,
-    # Tier 3 — Concealment / Access (Contextual Priority)
-    "ski_mask":      3,
-    "face_covering": 3,
-    "flashlight":    3,
-    "ladder":        3,
+CRITICAL_CLASSES = {
+    "handgun",
+    "knife"
 }
 
 
@@ -88,7 +69,7 @@ class ThreatState:
     Args:
         tracker_id:     Persistent ID assigned by ByteTrack.
         class_name:     YOLO class label ( "handgun", "crowbar", etc...).
-        tier:           Priority tier resolved from CLASS_TIER_MAP.
+        is_critical:    Bool value determing whether detection is critical.
         status:         Current lifecycle status (PENDING/CONFIRMED).
         frame_count:    Running count of frames this object has been visible.
                         Increments through PENDING → CONFIRMED.
@@ -103,7 +84,7 @@ class ThreatState:
     """
     tracker_id:    int
     class_name:    str
-    tier:          int
+    is_critical:   bool
     status:        ThreatStatus
     frame_count:   int
     confidence:    float
@@ -142,15 +123,18 @@ class ThreatState:
     def to_dict(self) -> dict:
         """Serialisable snapshot for logging, the Agentic Layer, or debug UIs."""
         return {
-            "tracker_id":   self.tracker_id,
-            "class_name":   self.class_name,
-            "tier":         self.tier,
-            "status":       self.status.name,
-            "frame_count":  self.frame_count,
-            "confidence":   round(self.confidence, 4),
-            "bbox":         self.bbox.tolist(),
-            "age_seconds":  round(self.age_seconds, 2),
-            "alert_fired":  self.alert_fired,
+            "tracker_id":    self.tracker_id,
+            "class_name":    self.class_name,
+            "is_critical":   self.is_critical,
+            "status":        self.status.name,
+            "frame_count":   self.frame_count,
+            "confidence":    round(self.confidence, 4),
+            "bbox":          self.bbox.tolist(),
+            "age_seconds":   round(self.age_seconds, 2),
+            "alert_fired":   self.alert_fired,
+            "active_zones":  list(self.active_zones),
+            "first_seen_at": self.first_seen_at,
+            "last_seen_at":  self.last_seen_at,
         }
 
 
@@ -196,13 +180,7 @@ class ActiveThreats:
         self._class_names:       dict[int, str]           = class_names or {}
         self._registry:          dict[int, ThreatState]   = {}
         self._newly_confirmed:   list[ThreatState]        = []
-
-        # Map tier -> confirm threshold for O(1) lookup during updates
-        self._tier_thresholds: dict[int, int] = {
-            1: config.tier1_confirm_frames,
-            2: config.tier2_confirm_frames,
-            3: config.tier3_confirm_frames,
-        }
+        self._confirm_frames:    int                      = config.critical_confirm_frames
 
     # ------------------------------------------------------------------
     # API
@@ -259,13 +237,6 @@ class ActiveThreats:
         """
         return list(self._newly_confirmed)
 
-    def get_by_tier(self, tier: int) -> list[ThreatState]:
-        """All CONFIRMED threats belonging to a specific tier."""
-        return [
-            s for s in self._registry.values()
-            if s.status == ThreatStatus.CONFIRMED and s.tier == tier
-        ]
-
     def get_by_tracker_id(self, tracker_id: int) -> Optional[ThreatState]:
         """Direct registry lookup. Returns None if ID is not tracked."""
         return self._registry.get(tracker_id)
@@ -320,14 +291,14 @@ class ActiveThreats:
         Register a new tracker ID.
 
         Starts as PENDING in all cases, then immediately checks whether the
-        configured threshold for this tier is already met at frame_count=1
+        configured threshold is already met at frame_count=1
         (i.e. threshold == 1).
         """
-        tier = self._resolve_tier(class_name)
+        is_critical = self._is_critical(class_name)
         entry = ThreatState(
             tracker_id  = tracker_id,
             class_name  = class_name,
-            tier        = tier,
+            is_critical = is_critical,
             status      = ThreatStatus.PENDING,
             frame_count = 1,
             confidence  = confidence,
@@ -335,13 +306,13 @@ class ActiveThreats:
         )
         self._registry[tracker_id] = entry
 
-        threshold = self._tier_thresholds.get(tier, self._config.tier3_confirm_frames)
+        threshold = self._confirm_frames
         if entry.frame_count >= threshold:
             self._confirm_entry(entry)
         else:
             logger.debug(
-                "PENDING   | ID %-4d | %-15s | Tier %d | conf=%.2f",
-                tracker_id, class_name, tier, confidence,
+                "PENDING   | ID %-4d | %-15s | Critical %d | conf=%.2f",
+                tracker_id, class_name, is_critical, confidence,
             )
 
     def _advance_entry(
@@ -364,7 +335,7 @@ class ActiveThreats:
  
         elif entry.status == ThreatStatus.PENDING:
             entry.frame_count += 1
-            threshold = self._tier_thresholds.get(entry.tier, self._config.tier3_confirm_frames)
+            threshold = self._confirm_frames
             if entry.frame_count >= threshold:
                 self._confirm_entry(entry)
  
@@ -377,8 +348,8 @@ class ActiveThreats:
         entry.status = ThreatStatus.CONFIRMED
         self._newly_confirmed.append(entry)
         logger.info(
-            "CONFIRMED | ID %-4d | %-15s | Tier %d | conf=%.2f | frames=%d",
-            entry.tracker_id, entry.class_name, entry.tier,
+            "CONFIRMED | ID %-4d | %-15s | Critical %d | conf=%.2f | frames=%d",
+            entry.tracker_id, entry.class_name, entry.is_critical,
             entry.confidence, entry.frame_count,
         )
 
@@ -395,8 +366,8 @@ class ActiveThreats:
             entry.cooldown_start = None
             entry.frame_count   += 1
             logger.info(
-                "REVIVED   | ID %-4d | %-15s | Tier %d | reappeared after cooldown",
-                entry.tracker_id, entry.class_name, entry.tier,
+                "REVIVED   | ID %-4d | %-15s | Critical %d | reappeared after cooldown",
+                entry.tracker_id, entry.class_name, entry.is_critical,
             )
         else:
             # Treat re-entry as a fresh sighting requiring full debounce
@@ -436,8 +407,8 @@ class ActiveThreats:
                 entry.status         = ThreatStatus.COOLDOWN
                 entry.cooldown_start = now
                 logger.info(
-                    "COOLDOWN  | ID %-4d | %-15s | Tier %d | last_seen=%.1fs ago",
-                    tracker_id, entry.class_name, entry.tier,
+                    "COOLDOWN  | ID %-4d | %-15s | Critical %d | last_seen=%.1fs ago",
+                    tracker_id, entry.class_name, entry.is_critical,
                     now - entry.last_seen_at,
                 )
  
@@ -481,12 +452,6 @@ class ActiveThreats:
             class_idx = int(detections.class_id[idx])
             return self._class_names.get(class_idx, "unknown")
         return "unknown"
-
-    def _resolve_tier(self, class_name: str) -> int:
-        """
-        Map a class label to its priority tier.
-        Defaults to Tier 3 for any class not yet in CLASS_TIER_MAP,
-        ensuring new/experimental classes are treated as contextual rather
-        than silently dropped or elevated to critical priority.
-        """
-        return CLASS_TIER_MAP.get(class_name, 3)
+    
+    def _is_critical(self, class_name: str) -> bool:
+        return class_name in CRITICAL_CLASSES
