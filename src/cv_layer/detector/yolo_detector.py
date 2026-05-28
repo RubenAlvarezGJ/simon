@@ -40,7 +40,7 @@ class YOLODetector:
             Returns sv.Detections.empty() if no detections exceed the confidence
             threshold. Class names can be retrieved via self.model.names[class_id]
         """
-        result = self.model(frame, device=self.device)[0]
+        result = self.model(frame, device=self.device, verbose=False)[0]
 
         # Converts Ultralytics result to Supervision Detections
         detections = sv.Detections.from_ultralytics(result)

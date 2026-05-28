@@ -34,13 +34,6 @@ class AdaptiveDetector:
         should_run_inference = motion_detected or (self.frame_count % self.inference_interval == 0)
 
         if should_run_inference:
-            # DEBUG logs ---------------------------------------------------
-            if motion_detected:
-                print("DEBUG: motion detected -> running inference")
-            else:
-                print("DEBUG: at base cadence -> running inference")
-            # --------------------------------------------------------------
-
             raw_detections = self.detector.detect(frame)
             self.last_detections = self.tracker.update_with_detections(raw_detections)
 
