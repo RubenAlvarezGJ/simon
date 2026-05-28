@@ -95,11 +95,6 @@ def main() -> int:
     )
     server = uvicorn.Server(config)
 
-    # uvicorn waits for in-flight HTTP responses to finish before running the
-    # lifespan shutdown that flips RuntimeState.shutdown_flag. The MJPEG stream
-    # never ends on its own, so flip the flag the moment a signal arrives --
-    # otherwise the first Ctrl+C deadlocks (the stream waits for the flag, the
-    # shutdown waits for the stream) until a second Ctrl+C forces the exit.
     _orig_handle_exit = server.handle_exit
 
     def handle_exit(sig, frame):
