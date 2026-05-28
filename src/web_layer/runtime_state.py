@@ -45,6 +45,7 @@ class RuntimeState:
     jpeg_bytes: Optional[bytes] = None
     frame_shape: Optional[tuple[int, int]] = None  # (height, width)
     frame_published_at: float = 0.0
+    shutdown_flag: bool = False
 
     # --- Atomic-ref-swap fields -------------------------------------------
     confirmed_snapshot: list[dict] = field(default_factory=list)
@@ -140,7 +141,7 @@ class RuntimeState:
         new frame, returns the current state regardless (caller must check).
         """
         with self.frame_cond:
-            self.frame_cond.wait_for(lambda: self.frame_id > last_id, timeout=timeout)
+            self.frame_cond.wait_for(lambda: self.frame_id > last_id or self.shutdown_flag, timeout=timeout)
             return self.frame_id, self.jpeg_bytes
 
     def state_dict(self) -> dict[str, Any]:
@@ -153,6 +154,15 @@ class RuntimeState:
             "frame_id": self.frame_id,
             "frame_shape": self.frame_shape,
         }
+    
+    def notify_shutdown(self):
+        with self.frame_cond:
+            self.shutdown_flag = True
+            self.frame_cond.notify_all()
+
+    @property
+    def is_shutdown(self) -> bool:
+        return self.shutdown_flag
 
     def uptime_seconds(self) -> float:
         return time.monotonic() - self.started_at

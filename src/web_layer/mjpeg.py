@@ -29,7 +29,7 @@ async def mjpeg_generator(
     re-check ``state`` periodically (e.g. for client disconnect).
     """
     last_id = 0
-    while True:
+    while not state.is_shutdown:
         try:
             frame_id, jpeg = await asyncio.to_thread(
                 _wait_for_new_frame, state, last_id, keepalive_timeout

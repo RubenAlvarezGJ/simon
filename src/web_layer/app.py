@@ -64,6 +64,8 @@ def create_app(
         try:
             yield
         finally:
+            logger.info("Lifespan shutting down")
+            runtime.notify_shutdown()
             r = getattr(app.state, "runner", None)
             if r is not None:
                 try:
