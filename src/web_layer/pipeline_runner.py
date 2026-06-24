@@ -13,7 +13,7 @@ import cv2
 
 from alert_layer.dispatcher import AlertDispatcher
 from alert_layer.overlay import OverlayBuffer, draw_overlay
-from alert_layer.sinks import ConsoleSink, JsonlSink, OverlaySink, Sink
+from alert_layer.sinks import ConsoleSink, JsonlSink, OverlaySink, TelegramSink, Sink
 from logic_layer.rule_evaluator import RuleEvaluator
 from logic_layer.spatial_engine import SpatialEngine
 from logic_layer.state_manager import ActiveThreats
@@ -158,6 +158,7 @@ class PipelineRunner:
             JsonlSink(self._jsonl_path),
             OverlaySink(overlay_buffer),
             BroadcastSink(self._state),
+            TelegramSink(),
             *self._extra_sinks,
         ]
 

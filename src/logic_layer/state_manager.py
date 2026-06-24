@@ -22,8 +22,7 @@ class StateManagerConfig:
     Configuration for the ActiveThreats registry.
 
     Args:
-        critical_confirm_frames:  Consecutive frames required to confirm a critical
-                                  detection. Low value = fast alert.
+        confirm_frames:        Consecutive frames required to confirm a detection.
         
         cooldown_seconds:      Duration (seconds) a lost ID is retained in
                                COOLDOWN before being purged. Prevents re-alerting
@@ -32,7 +31,7 @@ class StateManagerConfig:
                                directly to CONFIRMED, skipping debounce. Safe
                                to enable when tracker ID stability is high.
     """
-    critical_confirm_frames: int   = 3
+    confirm_frames: int   = 3
     cooldown_seconds:        float = 8.0
     revive_on_reentry:       bool  = True
 
@@ -180,7 +179,7 @@ class ActiveThreats:
         self._class_names:       dict[int, str]           = class_names or {}
         self._registry:          dict[int, ThreatState]   = {}
         self._newly_confirmed:   list[ThreatState]        = []
-        self._confirm_frames:    int                      = config.critical_confirm_frames
+        self._confirm_frames:    int                      = config.confirm_frames
 
     # ------------------------------------------------------------------
     # API

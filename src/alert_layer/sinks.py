@@ -3,13 +3,19 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import requests
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from logic_layer.rule_evaluator import TriggeredAlert
 
     from .overlay import OverlayBuffer
+
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -101,3 +107,87 @@ class OverlaySink:
 
     def deliver(self, alert: "TriggeredAlert") -> None:
         self._buffer.push(alert)
+
+
+# ---------------------------------------------------------------------------
+# TelegramSink
+# ---------------------------------------------------------------------------
+
+class TelegramSink:
+    """
+    Pushes a notification to a Telegram chat for every alert that involves at
+    least one critical threat.
+
+    Follows the project's Bypass Mode convention: if the bot token or chat ID
+    is missing from the environment, the sink logs an INFO line and becomes a
+    no-op rather than raising, so a misconfigured notifier never takes down the
+    surveillance pipeline.
+
+    Args:
+        timeout: Per-request HTTP timeout in seconds. Bounds how long a single
+                 ``deliver()`` call can block the shared dispatcher worker.
+    """
+
+    _API_BASE = "https://api.telegram.org"
+
+    def __init__(self, timeout: float = 5.0) -> None:
+        load_dotenv()
+
+        self._timeout = timeout
+        self._token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        self._chat_id = os.environ.get("CHAT_ID")
+        self._session = requests.Session()
+
+        self.bypass = not (self._token and self._chat_id)
+        if self.bypass:
+            logger.info(
+                "TelegramSink: TELEGRAM_BOT_TOKEN / CHAT_ID not set - "
+                "running in bypass mode (push notifications disabled)."
+            )
+
+    def deliver(self, alert: "TriggeredAlert") -> None:
+        if self.bypass:
+            return
+        if not any(s.get("is_critical") for s in alert.threat_snapshots):
+            return
+
+        url = f"{self._API_BASE}/bot{self._token}/sendMessage"
+        payload = {
+            "chat_id": self._chat_id,
+            "text": self._format_message(alert),
+        }
+
+        response = self._session.post(url, json=payload, timeout=self._timeout)
+        response.raise_for_status()
+        logger.info(
+            "TelegramSink: delivered alert %r (ids=%s)",
+            alert.rule_name,
+            alert.tracker_ids,
+        )
+
+    @staticmethod
+    def _format_message(alert: "TriggeredAlert") -> str:
+        """Build a plain-text notification body from the alert payload."""
+        critical = [
+            s for s in alert.threat_snapshots if s.get("is_critical")
+        ]
+        classes = sorted({s.get("class_name", "unknown") for s in critical})
+        zones = sorted(
+            {z for s in critical for z in s.get("active_zones", [])}
+        )
+
+        lines = [
+            "CRITICAL THREAT DETECTED",
+            f"Rule: {alert.rule_name}",
+            f"Class: {', '.join(classes) or 'unknown'}",
+        ]
+        if zones:
+            lines.append(f"Zone: {', '.join(zones)}")
+        lines.append(f"Tracker IDs: {alert.tracker_ids}")
+        if alert.rule_description:
+            lines.append(alert.rule_description)
+        return "\n".join(lines)
+
+    def close(self) -> None:
+        self._session.close()
+

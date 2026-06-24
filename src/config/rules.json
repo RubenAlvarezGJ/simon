@@ -1,22 +1,17 @@
 {
-    "_readme": "Default Configuration",
-
-    "rules": [
+  "rules": [
+    {
+      "name": "Test",
+      "description": "This is a test.",
+      "cooldown_seconds": 10.0,
+      "conditions": [
         {
-        "name": "Critical: Weapon Detected",
-        "description": "Lethal weapon (handgun, knife) detected anywhere on camera.",
-        "cooldown_seconds": 10.0,
-        "conditions": [
-            { "is_critical": true }
-        ]
-        },
-        {
-        "name": "Suspicious: Non-Critical Detection",
-        "description": "Non-critical object (intrusion tool, concealment item, person) detected.",
-        "cooldown_seconds": 60.0,
-        "conditions": [
-            { "is_critical": false }
-        ]
+          "class_name": null,
+          "is_critical": null,
+          "zone": "global",
+          "min_confidence": null
         }
-    ]
+      ]
+    }
+  ]
 }
