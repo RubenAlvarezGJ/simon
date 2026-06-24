@@ -2,9 +2,10 @@ export type Point = [number, number];
 export type Polygon = Point[];
 export type ZonesMap = Record<string, Polygon>;
 
+export type Severity = 'low' | 'high' | 'critical';
+
 export interface Condition {
   class_name?: string | null;
-  is_critical?: boolean | null;
   zone?: string | null;
   min_confidence?: number | null;
 }
@@ -12,6 +13,7 @@ export interface Condition {
 export interface Rule {
   name: string;
   description?: string;
+  severity?: Severity;
   cooldown_seconds: number;
   conditions: Condition[];
 }
@@ -23,7 +25,6 @@ export interface RulesPayload {
 export interface ThreatSnapshot {
   tracker_id: number;
   class_name: string;
-  is_critical: boolean;
   status: string;
   frame_count: number;
   confidence: number;
@@ -37,6 +38,7 @@ export interface ThreatSnapshot {
 
 export interface AlertPayload {
   rule_name: string;
+  severity: Severity;
   triggered_at: number;
   tracker_ids: number[];
   threat_snapshots: ThreatSnapshot[];
@@ -73,9 +75,7 @@ export interface HealthInfo {
   frame_id: number;
 }
 
-export type CriticalClasses = string[];
-
 export type WsEvent =
-  | { type: 'hello'; data: { critical_classes: CriticalClasses; zones: ZonesMap; frame_shape: [number, number] | null; frame_id: number } }
+  | { type: 'hello'; data: { severities: Severity[]; zones: ZonesMap; frame_shape: [number, number] | null; frame_id: number } }
   | { type: 'alert'; data: AlertPayload }
   | { type: 'snapshot'; data: { threats: ThreatSnapshot[]; pipeline_stats: PipelineStats; dispatcher_stats: DispatcherStats; frame_id: number } };

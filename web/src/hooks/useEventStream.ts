@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   AlertPayload,
-  CriticalClasses,
   DispatcherStats,
   PipelineStats,
+  Severity,
   ThreatSnapshot,
   WsEvent,
   ZonesMap,
@@ -12,7 +12,7 @@ import type {
 export interface EventStreamState {
   connected: boolean;
   hello: {
-    critical_classes: CriticalClasses;
+    severities: Severity[];
     zones: ZonesMap;
     frame_shape: [number, number] | null;
     frame_id: number;

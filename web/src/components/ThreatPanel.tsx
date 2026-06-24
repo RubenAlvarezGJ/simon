@@ -20,7 +20,6 @@ export function ThreatPanel() {
           <tr>
             <th>ID</th>
             <th>Class</th>
-            <th>Critical</th>
             <th>Conf</th>
             <th>Zones</th>
             <th>Age (s)</th>
@@ -28,10 +27,9 @@ export function ThreatPanel() {
         </thead>
         <tbody>
           {threats.map((t) => (
-            <tr key={t.tracker_id} className={t.is_critical ? 'critical' : 'non-critical'}>
+            <tr key={t.tracker_id}>
               <td>{t.tracker_id}</td>
               <td>{t.class_name}</td>
-              <td>{t.is_critical ? 'yes' : 'no'}</td>
               <td>{t.confidence.toFixed(2)}</td>
               <td>{t.active_zones.join(', ') || '-'}</td>
               <td>{t.age_seconds.toFixed(1)}</td>

@@ -1,14 +1,14 @@
 {
   "rules": [
     {
-      "name": "Test",
-      "description": "This is a test.",
-      "severity": "low",
-      "cooldown_seconds": 10.0,
+      "name": "Very Dangerous Bottle Spotted",
+      "description": "",
+      "severity": "critical",
+      "cooldown_seconds": 15.0,
       "conditions": [
         {
-          "class_name": null,
-          "zone": "global",
+          "class_name": "bottle",
+          "zone": "Porch",
           "min_confidence": null
         }
       ]

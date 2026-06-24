@@ -1,10 +1,95 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, rulesPayloadSchema } from '../lib/api';
-import type { Condition, CriticalClasses, Rule, ZonesMap } from '../lib/types';
+import type { Condition, Rule, Severity, ZonesMap } from '../lib/types';
+
+const SEVERITY_OPTIONS: Severity[] = ['low', 'high', 'critical'];
+
+const CLASS_OPTIONS: string[] = [
+  'person',
+  'bicycle',
+  'car',
+  'motorcycle',
+  'airplane',
+  'bus',
+  'train',
+  'truck',
+  'boat',
+  'traffic light',
+  'fire hydrant',
+  'stop sign',
+  'parking meter',
+  'bench',
+  'bird',
+  'cat',
+  'dog',
+  'horse',
+  'sheep',
+  'cow',
+  'elephant',
+  'bear',
+  'zebra',
+  'giraffe',
+  'backpack',
+  'umbrella',
+  'handbag',
+  'tie',
+  'suitcase',
+  'frisbee',
+  'skis',
+  'snowboard',
+  'sports ball',
+  'kite',
+  'baseball bat',
+  'baseball glove',
+  'skateboard',
+  'surfboard',
+  'tennis racket',
+  'bottle',
+  'wine glass',
+  'cup',
+  'fork',
+  'knife',
+  'spoon',
+  'bowl',
+  'banana',
+  'apple',
+  'sandwich',
+  'orange',
+  'broccoli',
+  'carrot',
+  'hot dog',
+  'pizza',
+  'donut',
+  'cake',
+  'chair',
+  'couch',
+  'potted plant',
+  'bed',
+  'dining table',
+  'toilet',
+  'tv',
+  'laptop',
+  'mouse',
+  'remote',
+  'keyboard',
+  'cell phone',
+  'microwave',
+  'oven',
+  'toaster',
+  'sink',
+  'refrigerator',
+  'book',
+  'clock',
+  'vase',
+  'scissors',
+  'teddy bear',
+  'hair drier',
+  'toothbrush',
+  'handgun',
+];
 
 const BLANK_CONDITION: Condition = {
   class_name: null,
-  is_critical: null,
   zone: null,
   min_confidence: null,
 };
@@ -13,14 +98,14 @@ function blankRule(): Rule {
   return {
     name: '',
     description: '',
+    severity: 'high',
     cooldown_seconds: 30,
-    conditions: [{ ...BLANK_CONDITION, is_critical: true }],
+    conditions: [{ ...BLANK_CONDITION }],
   };
 }
 
 export function RuleEditor() {
   const [rules, setRules] = useState<Rule[]>([]);
-  const [criticalClasses, setCriticalClasses] = useState<CriticalClasses>([]);
   const [zones, setZones] = useState<ZonesMap>({});
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<Rule>(blankRule());
@@ -30,16 +115,13 @@ export function RuleEditor() {
     void api.getRules()
       .then((rp) => setRules(rp.rules ?? []))
       .catch((err) => setStatus(`Rules load failed: ${err}`));
-    void api.getCriticalClasses()
-      .then(setCriticalClasses)
-      .catch((err) => setStatus(`Critical-classes load failed: ${err}`));
     void api.getZones()
       .then(setZones)
       .catch((err) => setStatus(`Zones load failed: ${err}`));
   }, []);
 
   const zoneOptions = useMemo(() => ['global', ...Object.keys(zones)], [zones]);
-  const classOptions = useMemo(() => criticalClasses, [criticalClasses]);
+  const classOptions = CLASS_OPTIONS;
 
   function startEdit(i: number) {
     setEditIdx(i);
@@ -96,15 +178,19 @@ export function RuleEditor() {
         <thead>
           <tr>
             <th>Name</th>
+            <th>Severity</th>
             <th>Cooldown</th>
             <th>Conditions</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {rules.map((r, i) => (
+          {rules.map((r, i) => {
+            const sev = r.severity ?? 'high';
+            return (
             <tr key={`${r.name}-${i}`}>
               <td><strong>{r.name}</strong>{r.description && <div className="muted">{r.description}</div>}</td>
+              <td><span className={`badge ${sev}`}>{sev}</span></td>
               <td>{r.cooldown_seconds}s</td>
               <td>
                 {r.conditions.map((c, j) => (
@@ -118,9 +204,10 @@ export function RuleEditor() {
                 <button onClick={() => deleteRule(i)}>Delete</button>
               </td>
             </tr>
-          ))}
+            );
+          })}
           {rules.length === 0 && (
-            <tr><td colSpan={4} className="muted">No rules yet.</td></tr>
+            <tr><td colSpan={5} className="muted">No rules yet.</td></tr>
           )}
         </tbody>
       </table>
@@ -142,7 +229,6 @@ export function RuleEditor() {
 function summariseCondition(c: Condition): string {
   const parts: string[] = [];
   if (c.class_name) parts.push(`class=${c.class_name}`);
-  if (c.is_critical != null) parts.push(`is_critical=${c.is_critical}`);
   if (c.zone) parts.push(`zone=${c.zone}`);
   if (c.min_confidence != null) parts.push(`conf>=${c.min_confidence}`);
   return parts.join(', ') || '(empty)';
@@ -164,7 +250,7 @@ function RuleForm({ rule, onChange, classOptions, zoneOptions, onCommit, onCance
     onChange({ ...rule, conditions: next });
   }
   function addCondition() {
-    onChange({ ...rule, conditions: [...rule.conditions, { ...BLANK_CONDITION, is_critical: true }] });
+    onChange({ ...rule, conditions: [...rule.conditions, { ...BLANK_CONDITION }] });
   }
   function removeCondition(i: number) {
     const next = rule.conditions.slice();
@@ -188,6 +274,17 @@ function RuleForm({ rule, onChange, classOptions, zoneOptions, onCommit, onCance
           value={rule.description ?? ''}
           onChange={(e) => onChange({ ...rule, description: e.target.value })}
         />
+      </label>
+      <label>
+        Severity
+        <select
+          value={rule.severity ?? 'high'}
+          onChange={(e) => onChange({ ...rule, severity: e.target.value as Severity })}
+        >
+          {SEVERITY_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
       </label>
       <label>
         Cooldown seconds
@@ -217,22 +314,6 @@ function RuleForm({ rule, onChange, classOptions, zoneOptions, onCommit, onCance
                   <option key={cn} value={cn} />
                 ))}
               </datalist>
-            </label>
-            <label>
-              Critical
-              <select
-                value={c.is_critical == null ? '' : c.is_critical ? 'true' : 'false'}
-                onChange={(e) =>
-                  setCondition(i, {
-                    is_critical:
-                      e.target.value === '' ? null : e.target.value === 'true',
-                  })
-                }
-              >
-                <option value="">(any)</option>
-                <option value="true">critical</option>
-                <option value="false">non-critical</option>
-              </select>
             </label>
             <label>
               Zone

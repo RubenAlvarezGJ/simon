@@ -1,9 +1,5 @@
 import { useEventStreamContext } from '../context/EventStreamContext';
 
-function anyCritical(snapshots: { is_critical: boolean }[]): boolean {
-  return snapshots.some((s) => s.is_critical);
-}
-
 function timeAgo(triggered_at: number): string {
   const sec = Math.max(0, Math.floor((Date.now() / 1000) - triggered_at));
   if (sec < 60) return `${sec}s ago`;
@@ -24,11 +20,12 @@ export function AlertLog() {
       ) : (
         <ul className="alert-list">
           {recent_alerts.map((a, i) => {
-            const cls = anyCritical(a.threat_snapshots) ? 'critical' : 'non-critical';
+            const sev = a.severity ?? 'high';
             return (
-              <li key={`${a.rule_name}-${a.triggered_at}-${i}`} className={`alert ${cls}`}>
+              <li key={`${a.rule_name}-${a.triggered_at}-${i}`} className={`alert ${sev}`}>
                 <div className="alert-head">
                   <strong>{a.rule_name}</strong>
+                  <span className={`badge ${sev}`}>{sev}</span>
                   <span className="muted">{timeAgo(a.triggered_at)}</span>
                 </div>
                 <div className="alert-body">
