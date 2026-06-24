@@ -36,16 +36,6 @@ class StateManagerConfig:
     revive_on_reentry:       bool  = True
 
 
-# ------------------------------------------------------------------------------------
-# Set of critical classes
-# ------------------------------------------------------------------------------------
-
-CRITICAL_CLASSES = {
-    "handgun",
-    "knife"
-}
-
-
 # ------------------------------------------------------------------
 # Data Structures
 # ------------------------------------------------------------------
@@ -68,7 +58,6 @@ class ThreatState:
     Args:
         tracker_id:     Persistent ID assigned by ByteTrack.
         class_name:     YOLO class label ( "handgun", "crowbar", etc...).
-        is_critical:    Bool value determing whether detection is critical.
         status:         Current lifecycle status (PENDING/CONFIRMED).
         frame_count:    Running count of frames this object has been visible.
                         Increments through PENDING → CONFIRMED.
@@ -83,7 +72,6 @@ class ThreatState:
     """
     tracker_id:    int
     class_name:    str
-    is_critical:   bool
     status:        ThreatStatus
     frame_count:   int
     confidence:    float
@@ -124,7 +112,6 @@ class ThreatState:
         return {
             "tracker_id":    self.tracker_id,
             "class_name":    self.class_name,
-            "is_critical":   self.is_critical,
             "status":        self.status.name,
             "frame_count":   self.frame_count,
             "confidence":    round(self.confidence, 4),
@@ -293,11 +280,9 @@ class ActiveThreats:
         configured threshold is already met at frame_count=1
         (i.e. threshold == 1).
         """
-        is_critical = self._is_critical(class_name)
         entry = ThreatState(
             tracker_id  = tracker_id,
             class_name  = class_name,
-            is_critical = is_critical,
             status      = ThreatStatus.PENDING,
             frame_count = 1,
             confidence  = confidence,
@@ -310,8 +295,8 @@ class ActiveThreats:
             self._confirm_entry(entry)
         else:
             logger.debug(
-                "PENDING   | ID %-4d | %-15s | Critical %d | conf=%.2f",
-                tracker_id, class_name, is_critical, confidence,
+                "PENDING   | ID %-4d | %-15s | conf=%.2f",
+                tracker_id, class_name, confidence,
             )
 
     def _advance_entry(
@@ -347,8 +332,8 @@ class ActiveThreats:
         entry.status = ThreatStatus.CONFIRMED
         self._newly_confirmed.append(entry)
         logger.info(
-            "CONFIRMED | ID %-4d | %-15s | Critical %d | conf=%.2f | frames=%d",
-            entry.tracker_id, entry.class_name, entry.is_critical,
+            "CONFIRMED | ID %-4d | %-15s | conf=%.2f | frames=%d",
+            entry.tracker_id, entry.class_name,
             entry.confidence, entry.frame_count,
         )
 
@@ -365,8 +350,8 @@ class ActiveThreats:
             entry.cooldown_start = None
             entry.frame_count   += 1
             logger.info(
-                "REVIVED   | ID %-4d | %-15s | Critical %d | reappeared after cooldown",
-                entry.tracker_id, entry.class_name, entry.is_critical,
+                "REVIVED   | ID %-4d | %-15s | reappeared after cooldown",
+                entry.tracker_id, entry.class_name,
             )
         else:
             # Treat re-entry as a fresh sighting requiring full debounce
@@ -406,8 +391,8 @@ class ActiveThreats:
                 entry.status         = ThreatStatus.COOLDOWN
                 entry.cooldown_start = now
                 logger.info(
-                    "COOLDOWN  | ID %-4d | %-15s | Critical %d | last_seen=%.1fs ago",
-                    tracker_id, entry.class_name, entry.is_critical,
+                    "COOLDOWN  | ID %-4d | %-15s | last_seen=%.1fs ago",
+                    tracker_id, entry.class_name,
                     now - entry.last_seen_at,
                 )
  
@@ -451,6 +436,3 @@ class ActiveThreats:
             class_idx = int(detections.class_id[idx])
             return self._class_names.get(class_idx, "unknown")
         return "unknown"
-    
-    def _is_critical(self, class_name: str) -> bool:
-        return class_name in CRITICAL_CLASSES

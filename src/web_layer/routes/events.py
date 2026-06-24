@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from logic_layer.state_manager import CRITICAL_CLASSES
+from logic_layer.rule_evaluator import Severity
 
 from ..runtime_state import RuntimeState
 
@@ -32,7 +32,7 @@ def _hello_frame(state: RuntimeState, zones: dict) -> dict:
     return {
         "type": "hello",
         "data": {
-            "critical_classes": sorted(CRITICAL_CLASSES),
+            "severities": [s.value for s in Severity],
             "zones": zones,
             "frame_shape": state.frame_shape,
             "frame_id": state.frame_id,

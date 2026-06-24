@@ -1,10 +1,10 @@
-"""State / diagnostics routes: /api/state, /api/critical-classes, /api/health."""
+"""State / diagnostics routes: /api/state, /api/severities, /api/health."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from logic_layer.state_manager import CRITICAL_CLASSES
+from logic_layer.rule_evaluator import Severity
 
 from ..runtime_state import RuntimeState
 
@@ -20,9 +20,9 @@ async def get_state(request: Request) -> dict:
     return _state(request).state_dict()
 
 
-@router.get("/api/critical-classes")
-async def get_critical_classes() -> list[str]:
-    return sorted(CRITICAL_CLASSES)
+@router.get("/api/severities")
+async def get_severities() -> list[str]:
+    return [s.value for s in Severity]
 
 
 @router.get("/api/health")

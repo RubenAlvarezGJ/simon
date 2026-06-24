@@ -3,11 +3,11 @@
     {
       "name": "Test",
       "description": "This is a test.",
+      "severity": "low",
       "cooldown_seconds": 10.0,
       "conditions": [
         {
           "class_name": null,
-          "is_critical": null,
           "zone": "global",
           "min_confidence": null
         }

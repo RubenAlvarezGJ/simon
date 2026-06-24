@@ -3,13 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import (
     BaseModel,
     Field,
     RootModel,
-    StrictBool,
     conint,
     conlist,
     model_validator,
@@ -25,7 +24,6 @@ class ConditionSchema(BaseModel):
     """A single rule condition. At least one field must be set."""
 
     class_name: Optional[str] = None
-    is_critical: Optional[StrictBool] = None
     zone: Optional[str] = None
     min_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
@@ -33,11 +31,11 @@ class ConditionSchema(BaseModel):
     def _require_at_least_one_field(self) -> "ConditionSchema":
         if all(
             v is None
-            for v in (self.class_name, self.is_critical, self.zone, self.min_confidence)
+            for v in (self.class_name, self.zone, self.min_confidence)
         ):
             raise ValueError(
                 "Condition must set at least one of: "
-                "class_name, is_critical, zone, min_confidence."
+                "class_name, zone, min_confidence."
             )
         return self
 
@@ -45,6 +43,7 @@ class ConditionSchema(BaseModel):
 class RuleSchema(BaseModel):
     name: str = Field(min_length=1)
     description: str = ""
+    severity: Literal["low", "high", "critical"] = "high"
     cooldown_seconds: float = Field(default=30.0, ge=0.0)
     conditions: conlist(ConditionSchema, min_length=1)  # type: ignore[valid-type]
 

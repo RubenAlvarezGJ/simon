@@ -42,8 +42,9 @@ class ConsoleSink:
 
     def deliver(self, alert: "TriggeredAlert") -> None:
         self._logger.info(
-            "[ALERT] %s | ids=%s | t=%.3f",
+            "[ALERT] %s | sev=%s | ids=%s | t=%.3f",
             alert.rule_name,
+            alert.severity.value,
             alert.tracker_ids,
             alert.triggered_at,
         )
@@ -115,8 +116,12 @@ class OverlaySink:
 
 class TelegramSink:
     """
-    Pushes a notification to a Telegram chat for every alert that involves at
-    least one critical threat.
+    Pushes a notification to a Telegram chat, routed by the alert's severity.
+
+    Routing:
+        - ``low``      not sent (logged by other sinks only).
+        - ``high``     sent with ``disable_notification=True`` (silent).
+        - ``critical`` sent with ``disable_notification=False`` (audible).
 
     Follows the project's Bypass Mode convention: if the bot token or chat ID
     is missing from the environment, the sink logs an INFO line and becomes a
@@ -148,36 +153,37 @@ class TelegramSink:
     def deliver(self, alert: "TriggeredAlert") -> None:
         if self.bypass:
             return
-        if not any(s.get("is_critical") for s in alert.threat_snapshots):
+        
+        if alert.severity == "low":
             return
 
         url = f"{self._API_BASE}/bot{self._token}/sendMessage"
         payload = {
             "chat_id": self._chat_id,
             "text": self._format_message(alert),
+            "disable_notification": alert.severity == "high",
         }
 
         response = self._session.post(url, json=payload, timeout=self._timeout)
         response.raise_for_status()
         logger.info(
-            "TelegramSink: delivered alert %r (ids=%s)",
+            "TelegramSink: delivered alert %r (sev=%s, ids=%s)",
             alert.rule_name,
+            alert.severity.value,
             alert.tracker_ids,
         )
 
     @staticmethod
     def _format_message(alert: "TriggeredAlert") -> str:
         """Build a plain-text notification body from the alert payload."""
-        critical = [
-            s for s in alert.threat_snapshots if s.get("is_critical")
-        ]
-        classes = sorted({s.get("class_name", "unknown") for s in critical})
+        snapshots = alert.threat_snapshots
+        classes = sorted({s.get("class_name", "unknown") for s in snapshots})
         zones = sorted(
-            {z for s in critical for z in s.get("active_zones", [])}
+            {z for s in snapshots for z in s.get("active_zones", [])}
         )
 
         lines = [
-            "CRITICAL THREAT DETECTED",
+            f"{alert.severity.value.upper()} DETECTION",
             f"Rule: {alert.rule_name}",
             f"Class: {', '.join(classes) or 'unknown'}",
         ]

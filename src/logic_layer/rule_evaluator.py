@@ -6,10 +6,11 @@ Rule Schema Example:
         {
           "name":             "Porch Intruder",
           "description":      "Person on porch carrying an intrusion tool.",
+          "severity":         "critical",
           "cooldown_seconds": 30.0,
           "conditions": [
             { "class_name": "person", "zone": "porch", "min_confidence": 0.60 },
-            { "is_critical": true }
+            { "class_name": "knife" }
           ]
         }
       ]
@@ -27,6 +28,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 
@@ -35,6 +37,42 @@ if TYPE_CHECKING:
     from state_manager import ThreatState
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Severity - declared per rule, drives downstream alert routing
+# ---------------------------------------------------------------------------
+
+class Severity(str, Enum):
+    """
+    Severity of a rule, set in ``rules.json`` and carried on every
+    ``TriggeredAlert`` the rule produces.  Sinks route on this value:
+
+      - ``LOW``      logged only (no push notification).
+      - ``HIGH``     pushed to Telegram silently (``disable_notification``).
+      - ``CRITICAL`` pushed to Telegram with notification sound.
+    """
+    LOW      = "low"
+    HIGH     = "high"
+    CRITICAL = "critical"
+
+    @classmethod
+    def from_value(cls, value: object, default: "Severity" = None) -> "Severity":
+        """
+        Coerce a raw JSON value into a ``Severity``.
+
+        Returns ``default`` (``HIGH`` when unspecified) for anything that is
+        not one of the three known levels, so a typo in ``rules.json`` never
+        rejects the rule outright.
+        """
+        if default is None:
+            default = cls.HIGH
+        if isinstance(value, str):
+            try:
+                return cls(value.strip().lower())
+            except ValueError:
+                return default
+        return default
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +90,7 @@ class TriggeredAlert:
     Attributes:
         rule_name:    The ``name`` field of the rule that fired.  Used by the
                       dispatcher for notification routing and deduplication.
+        severity:     The firing rule's ``Severity`` (low/high/critical).
         triggered_at: Wall-clock timestamp (``time.time()``) at the moment
                       the rule fired.  Use for log correlation and display.
         tracker_ids:  Deduplicated list of ByteTrack IDs for every
@@ -71,11 +110,13 @@ class TriggeredAlert:
     tracker_ids:       list[int]
     threat_snapshots:  list[dict]
     rule_description:  str = ""
+    severity:          Severity = Severity.HIGH
 
     def to_dict(self) -> dict:
         """Fully serialisable snapshot for structured logging or queue transport."""
         return {
             "rule_name":        self.rule_name,
+            "severity":         self.severity.value,
             "triggered_at":     self.triggered_at,
             "tracker_ids":      self.tracker_ids,
             "threat_snapshots": self.threat_snapshots,
@@ -99,13 +140,11 @@ class ConditionSpec:
 
     Attributes:
         class_name:     Exact YOLO class label to match, or ``None``.
-        is_critical:    True/False, or ``None``.
         zone:           Zone name that must appear in ``active_zones``,
                         or ``None`` (any zone including "global" is accepted).
         min_confidence: Minimum confidence threshold, or ``None``.
     """
     class_name:     Optional[str]   = None
-    is_critical:    Optional[bool]   = None
     zone:           Optional[str]   = None
     min_confidence: Optional[float] = None
 
@@ -119,6 +158,8 @@ class RuleDefinition:
         name:             Unique rule identifier string.
         conditions:       Ordered list of ``ConditionSpec`` objects.  ALL
                           must be satisfied for the rule to fire (AND logic).
+        severity:         ``Severity`` level.
+                          Defaults to ``HIGH`` when omitted from the JSON.
         cooldown_seconds: Minimum interval between successive alerts for
                           this rule.
         description:      Optional operator annotation.
@@ -126,6 +167,7 @@ class RuleDefinition:
     name:             str
     conditions:       list[ConditionSpec]
     cooldown_seconds: float
+    severity:         Severity = Severity.HIGH
     description:      str = ""
 
 
@@ -140,15 +182,12 @@ class FrameIndex:
 
     Attributes:
         by_class:    Maps class label → list of matching ThreatStates.
-        by_critical: Maps critical flag (True/False) → list of matching
-                     ThreatStates.
         by_zone:     Maps zone name → list of matching ThreatStates.
                      A ThreatState appears under EVERY zone in its
                      ``active_zones`` list.
         all:         Unfiltered reference to the full confirmed threat list.
     """
     by_class:    dict[str,  list["ThreatState"]] = field(default_factory=dict)
-    by_critical: dict[bool, list["ThreatState"]] = field(default_factory=dict)
     by_zone:     dict[str,  list["ThreatState"]] = field(default_factory=dict)
     all:         list["ThreatState"]             = field(default_factory=list)
 
@@ -164,8 +203,8 @@ class RuleEvaluator:
         A rule fires when **every** one of its conditions is independently
         satisfied by **at least one** ThreatState in the current frame.
         Multiple conditions may be satisfied by the **same** ThreatState
-        (e.g. a critical weapon on the porch satisfies both an is_critical
-        condition and a zone condition).  The ``tracker_ids`` in the resulting alert is the
+        (e.g. a knife on the porch satisfies both a class_name condition
+        and a zone condition).  The ``tracker_ids`` in the resulting alert is the
         **union** of all contributing object IDs.
 
     Cooldown model:
@@ -227,7 +266,7 @@ class RuleEvaluator:
             threats: List of confirmed, spatially-tagged ``ThreatState``
                      objects from ``registry.get_confirmed_threats()``.
                      Each object must expose: ``tracker_id``, ``class_name``,
-                     ``is_critical``, ``confidence``, ``active_zones``, ``to_dict()``.
+                     ``confidence``, ``active_zones``, ``to_dict()``.
 
         Returns:
             List of ``TriggeredAlert`` objects for every rule that fired this
@@ -304,6 +343,7 @@ class RuleEvaluator:
             "rules": [
                 {
                     "name":             r.name,
+                    "severity":         r.severity.value,
                     "conditions":       len(r.conditions),
                     "cooldown_seconds": r.cooldown_seconds,
                 }
@@ -358,6 +398,7 @@ class RuleEvaluator:
             tracker_ids      = tracker_ids,
             threat_snapshots = threat_snapshots,
             rule_description = rule.description,
+            severity         = rule.severity,
         )
 
     def _resolve_condition(
@@ -370,9 +411,9 @@ class RuleEvaluator:
 
         Index selection strategy:
             Start from the most selective index available in priority order:
-            ``class_name`` > ``zone`` > ``is_critical`` > ``all``.  Then apply
-            any remaining field filters as a linear pass over that candidate
-            set.  This minimises the number of objects touched per condition.
+            ``class_name`` > ``zone`` > ``all``.  Then apply any remaining
+            field filters as a linear pass over that candidate set.  This
+            minimises the number of objects touched per condition.
 
         Args:
             condition: The compiled condition spec to resolve.
@@ -386,8 +427,6 @@ class RuleEvaluator:
             candidates = index.by_class.get(condition.class_name, [])
         elif condition.zone is not None:
             candidates = index.by_zone.get(condition.zone, [])
-        elif condition.is_critical is not None:
-            candidates = index.by_critical.get(condition.is_critical, [])
         else:
             candidates = index.all
 
@@ -398,8 +437,6 @@ class RuleEvaluator:
         result = []
         for threat in candidates:
             if condition.class_name is not None and threat.class_name != condition.class_name:
-                continue
-            if condition.is_critical is not None and threat.is_critical != condition.is_critical:
                 continue
             if condition.zone is not None and condition.zone not in threat.active_zones:
                 continue
@@ -418,7 +455,7 @@ class RuleEvaluator:
         """
         Build a per-frame multi-key index over the confirmed threat list.
 
-        Called once per ``evaluate()`` invocation.  All three index dicts are
+        Called once per ``evaluate()`` invocation.  Both index dicts are
         populated in a single O(N_threats x |active_zones|) pass.
 
         A ThreatState is inserted under EVERY zone in its ``active_zones``
@@ -430,9 +467,6 @@ class RuleEvaluator:
         for threat in threats:
             # Index by class
             idx.by_class.setdefault(threat.class_name, []).append(threat)
-
-            # Index by critical flag
-            idx.by_critical.setdefault(threat.is_critical, []).append(threat)
 
             # Index by every zone the threat currently occupies
             for zone_name in threat.active_zones:
@@ -517,7 +551,8 @@ class RuleEvaluator:
         Validate and compile a single rule dict into a ``RuleDefinition``.
 
         Required fields:  ``name``, ``conditions``.
-        Optional fields:  ``cooldown_seconds`` (default 30.0), ``description``.
+        Optional fields:  ``severity`` (default ``"high"``),
+                          ``cooldown_seconds`` (default 30.0), ``description``.
 
         Args:
             entry: Raw JSON value for one rule entry.
@@ -560,12 +595,26 @@ class RuleEvaluator:
             )
             cooldown = 30.0
 
+        # Optional: severity (low/high/critical; default high)
+        severity_raw = entry.get("severity")
+        severity = Severity.from_value(severity_raw)
+        valid_severity = (
+            isinstance(severity_raw, str)
+            and severity_raw.strip().lower() in (s.value for s in Severity)
+        )
+        if severity_raw is not None and not valid_severity:
+            logger.warning(
+                "RULE_EVAL | Rule '%s' - invalid 'severity' %r; using '%s'.",
+                name, severity_raw, severity.value,
+            )
+
         description = entry.get("description", "")
 
         return RuleDefinition(
             name             = name.strip(),
             conditions       = conditions,
             cooldown_seconds = float(cooldown),
+            severity         = severity,
             description      = str(description),
         )
 
@@ -575,8 +624,8 @@ class RuleEvaluator:
         """
         Validate and compile a single condition dict into a ``ConditionSpec``.
 
-        Valid filter fields: ``class_name`` (str), ``is_critical`` (bool),
-        ``zone`` (str), ``min_confidence`` (float 0.0-1.0).
+        Valid filter fields: ``class_name`` (str), ``zone`` (str),
+        ``min_confidence`` (float 0.0-1.0).
         At least one field must be present.
 
         Args:
@@ -594,17 +643,12 @@ class RuleEvaluator:
             return None
 
         class_name     = entry.get("class_name")
-        is_critical    = entry.get("is_critical")
         zone           = entry.get("zone")
         min_confidence = entry.get("min_confidence")
 
         # Field-level validation
         if class_name is not None and not isinstance(class_name, str):
             logger.warning("%s - 'class_name' must be a string.", prefix)
-            return None
-
-        if is_critical is not None and not isinstance(is_critical, bool):
-            logger.warning("%s - 'is_critical' must be a boolean.", prefix)
             return None
 
         if zone is not None and not isinstance(zone, str):
@@ -617,17 +661,16 @@ class RuleEvaluator:
                 return None
 
         # Require at least one filter field
-        if all(v is None for v in (class_name, is_critical, zone, min_confidence)):
+        if all(v is None for v in (class_name, zone, min_confidence)):
             logger.warning(
                 "%s - empty condition (no filter fields). "
-                "Use at least one of: class_name, is_critical, zone, min_confidence.",
+                "Use at least one of: class_name, zone, min_confidence.",
                 prefix,
             )
             return None
 
         return ConditionSpec(
             class_name     = class_name,
-            is_critical    = is_critical,
             zone           = zone,
             min_confidence = float(min_confidence) if min_confidence is not None else None,
         )
