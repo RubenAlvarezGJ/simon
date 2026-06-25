@@ -1,7 +1,67 @@
+:root {
+  color-scheme: dark;
+
+  /* Core palette (Command Center bundle) */
+  --bg: #07090b;
+  --panel-bg: #0a0e12;
+  --panel-bg-alt: #0b0f14;
+  --panel-border: #1a212a;
+  --panel-border-soft: #161d25;
+  --panel-border-strong: #1d262f;
+  --hairline: #131a21;
+  --row-line: #11171d;
+
+  /* Text shades */
+  --text: #c9d3dd;
+  --text-strong: #eef3f7;
+  --text-bright: #dbe4ec;
+  --heading: #a9b6c1;
+  --muted: #5d6b78;
+  --muted-2: #7c8b98;
+  --muted-3: #8593a0;
+
+  /* Accent + status. --ac is the live, recolorable accent the HUD reads. */
+  --accent: #2fd6ff;
+  --ac: #2fd6ff;
+  --ok: #38e08a;
+  --warn: #ffb020;
+  --bad: #ff4d4d;
+  --bad-bright: #ff5c5c;
+
+  --critical-bg: rgba(255, 77, 77, 0.05);
+  --high-bg: rgba(255, 176, 32, 0.08);
+  --low-bg: rgba(47, 214, 255, 0.06);
+
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+  --sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
 }
-body { background: #0e1116; color: #d8dee9; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+::selection { background: rgba(47, 214, 255, 0.28); }
+
+/* Thin custom scrollbars (from bundle) */
+*::-webkit-scrollbar { width: 7px; height: 7px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #1c252e; border-radius: 4px; }
+
+/* Animations from the bundle */
+@keyframes pulseDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes ring {
+  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.45); }
+  100% { box-shadow: 0 0 0 12px rgba(255, 77, 77, 0); }
+}
+@keyframes barflux { 0%, 100% { transform: scaleY(0.45); } 50% { transform: scaleY(1); } }

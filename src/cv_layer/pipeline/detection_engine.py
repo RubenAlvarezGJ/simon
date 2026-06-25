@@ -175,7 +175,7 @@ class DetectionEngine:
 
             # --- GPU Inference ---
             t0 = time.perf_counter()
-            annotated_frame, detections = self._detector.process_frame(frame, fps)
+            annotated_frame, detections = self._detector.process_frame(frame)
             inference_time = time.perf_counter() - t0
 
             self._frames_processed += 1
