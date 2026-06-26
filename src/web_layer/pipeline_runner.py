@@ -35,7 +35,7 @@ def _default_detector_factory() -> Any:
     from cv_layer.detector.adaptive_detector import AdaptiveDetector
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    return AdaptiveDetector("models/yolo11n.pt", device=device)
+    return AdaptiveDetector("models/yolo11s.pt", device=device)
 
 
 def _default_pipeline_factory(

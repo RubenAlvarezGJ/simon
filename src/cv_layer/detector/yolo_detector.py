@@ -3,7 +3,7 @@ import cv2
 import supervision as sv
 
 class YOLODetector:
-    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.5, device="cuda"):
+    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.7, device="cuda"):
         """
         Initializes the YOLO object detector.
 
@@ -17,9 +17,8 @@ class YOLODetector:
         self.device = device
         self.model.to(device) # move model to gpu
 
-        self.box_annotator = sv.BoxAnnotator()
-        self.label_annotator = sv.LabelAnnotator()
-        self.trace_annotator = sv.TraceAnnotator()
+        self.box_annotator = sv.BoxAnnotator(color=sv.Color.RED, thickness=1)
+        self.label_annotator = sv.LabelAnnotator(color=sv.Color.RED, text_color=sv.Color.BLACK)
     
     def detect(self, frame):
         """  
@@ -52,7 +51,7 @@ class YOLODetector:
 
     def visualize(self, frame, detections: sv.Detections, fps=None):
         """
-        Draws bounding boxes, tracking labels, and traces onto a frame.
+        Draws bounding boxes and tracking labels.
 
         Parameters:
             frame: OpenCV frame to draw on.
@@ -74,12 +73,10 @@ class YOLODetector:
             else:
                 labels.append(f"{class_name} {confidence:.2f}")
 
-        annotated_frame = self.trace_annotator.annotate(
+        annotated_frame = self.box_annotator.annotate(
             scene=frame, detections=detections
         )
-        annotated_frame = self.box_annotator.annotate(
-            scene=annotated_frame, detections=detections
-        )
+
         annotated_frame = self.label_annotator.annotate(
             scene=annotated_frame, detections=detections, labels=labels
         )
