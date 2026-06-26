@@ -16,11 +16,7 @@ function Dashboard() {
       <AppHeader tab={tab} onTab={setTab} now={now} uptimeS={uptimeS} />
 
       {tab === 'command' && <CommandCenter now={now} fps={fps} spark={spark} />}
-      {tab === 'zones' && (
-        <div className="cc-editor-page">
-          <ZoneEditor />
-        </div>
-      )}
+      {tab === 'zones' && <ZoneEditor />}
       {tab === 'rules' && (
         <div className="cc-editor-page">
           <RuleEditor />

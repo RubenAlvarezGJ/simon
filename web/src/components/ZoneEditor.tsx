@@ -1,35 +1,55 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { api, zonesSchema } from '../lib/api';
-import { findContainingZone, nearestVertex } from '../lib/polygon';
 import type { Point, Polygon, SnapshotMeta, ZonesMap } from '../lib/types';
+import { ZoneToolbar } from './zone-editor/ZoneToolbar';
+import { ZoneCanvas } from './zone-editor/ZoneCanvas';
+import { ZoneList } from './zone-editor/ZoneList';
+import { ZoneGuide } from './zone-editor/ZoneGuide';
+import type { DragState, EditorStatus, Mode } from './zone-editor/types';
 
-type Mode = 'view' | 'draw' | 'edit' | 'delete';
-const VERTEX_HIT_RADIUS = 10;
-
-interface DragState {
-  zone: string;
-  vertexIdx: number;
-}
+const STATUS_DOT: Record<EditorStatus['kind'], string> = {
+  ok: 'var(--ok)',
+  pending: 'var(--warn)',
+  err: 'var(--bad)',
+};
 
 export function ZoneEditor() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
   const [meta, setMeta] = useState<SnapshotMeta | null>(null);
   const [snapshotUrl, setSnapshotUrl] = useState<string>('');
   const [zones, setZones] = useState<ZonesMap>({});
   const [mode, setMode] = useState<Mode>('view');
+  const [selected, setSelected] = useState<string | null>(null);
   const [pending, setPending] = useState<Polygon | null>(null);
   const [dragging, setDragging] = useState<DragState | null>(null);
-  const [status, setStatus] = useState<string>('');
-  const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  const [cursor, setCursor] = useState<Point>([960, 540]);
+  const [naming, setNaming] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const [status, setStatus] = useState<EditorStatus>({
+    text: 'Loading zones from /api/zones…',
+    kind: 'pending',
+  });
 
-  // Load initial snapshot + zones
+  // Initial load: snapshot meta/url + zones.
   useEffect(() => {
     void refreshSnapshot();
     void api
       .getZones()
-      .then(setZones)
-      .catch((err) => setStatus(`Failed to load zones: ${err}`));
+      .then((z) => {
+        setZones(z);
+        const n = Object.keys(z).length;
+        setStatus({ text: `Loaded ${n} zone${n === 1 ? '' : 's'} from /api/zones.`, kind: 'ok' });
+      })
+      .catch((err) => setStatus({ text: `Failed to load zones: ${err}`, kind: 'err' }));
   }, []);
+
+  // Focus the name input when the naming overlay opens.
+  useEffect(() => {
+    if (naming) inputRef.current?.focus();
+  }, [naming]);
 
   async function refreshSnapshot() {
     try {
@@ -37,220 +57,212 @@ export function ZoneEditor() {
       setMeta(m);
       setSnapshotUrl(api.snapshotUrl(true));
     } catch (err) {
-      setStatus(`Snapshot unavailable: ${err}`);
+      setStatus({ text: `Snapshot unavailable: ${err}`, kind: 'err' });
     }
   }
 
-  // Load <img> for canvas drawing whenever snapshotUrl changes
-  useEffect(() => {
-    if (!snapshotUrl) return;
-    const img = new Image();
-    img.onload = () => setBgImage(img);
-    img.src = snapshotUrl;
-  }, [snapshotUrl]);
-
-  // Re-draw on any change
-  useEffect(() => {
-    drawCanvas();
-  });
-
-  function drawCanvas() {
-    const canvas = canvasRef.current;
-    if (!canvas || !meta) return;
-    canvas.width = meta.width;
-    canvas.height = meta.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (bgImage) {
-      ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-    } else {
-      ctx.fillStyle = '#222';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    for (const [name, poly] of Object.entries(zones)) {
-      drawPolygon(ctx, poly, name, 'rgba(64, 200, 255, 0.25)', 'rgba(64, 200, 255, 0.9)');
-    }
-    if (pending && pending.length > 0) {
-      drawPolygon(ctx, pending, '(new)', 'rgba(255, 200, 0, 0.2)', 'rgba(255, 200, 0, 0.95)', true);
-    }
-  }
-
-  function canvasPoint(e: MouseEvent<HTMLCanvasElement>): Point {
-    const canvas = canvasRef.current;
-    if (!canvas) return [0, 0];
-    const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width;
-    const sy = canvas.height / rect.height;
-    const clamp = (v: number, max: number) => Math.min(max, Math.max(0, v));
+  // Map a client-space event to image (viewBox) coordinates, clamped to frame bounds.
+  function toImg(e: { clientX: number; clientY: number }): Point {
+    const svg = svgRef.current;
+    const w = meta?.width ?? 1920;
+    const h = meta?.height ?? 1080;
+    if (!svg) return [0, 0];
+    const r = svg.getBoundingClientRect();
+    const sx = w / r.width;
+    const sy = h / r.height;
+    const clamp = (v: number, m: number) => Math.min(m, Math.max(0, v));
     return [
-      clamp(Math.round((e.clientX - rect.left) * sx), canvas.width),
-      clamp(Math.round((e.clientY - rect.top) * sy), canvas.height),
+      clamp(Math.round((e.clientX - r.left) * sx), w),
+      clamp(Math.round((e.clientY - r.top) * sy), h),
     ];
   }
 
-  function onMouseDown(e: MouseEvent<HTMLCanvasElement>) {
-    if (!meta) return;
-    const p = canvasPoint(e);
+  function changeMode(m: Mode) {
+    setMode(m);
+    setPending(null);
+    setNaming(false);
+  }
+
+  function onBgDown(e: MouseEvent) {
+    if (e.button !== 0) return;
     if (mode === 'draw') {
-      if (e.button !== 0) return;
-      setPending((cur) => [...(cur ?? []), p]);
+      const p = toImg(e);
+      setPending((cur) => {
+        const next = [...(cur ?? []), p];
+        setStatus({ text: `Vertex ${next.length} placed. Double-click to finish.`, kind: 'pending' });
+        return next;
+      });
       return;
     }
-    if (mode === 'edit') {
-      for (const [name, poly] of Object.entries(zones)) {
-        const idx = nearestVertex(poly, p, VERTEX_HIT_RADIUS);
-        if (idx !== -1) {
-          if (e.button === 2 && poly.length > 3) {
-            // Right-click to delete vertex.
-            e.preventDefault();
-            const next = poly.filter((_, i) => i !== idx);
-            setZones({ ...zones, [name]: next });
-          } else {
-            setDragging({ zone: name, vertexIdx: idx });
-          }
-          return;
-        }
-      }
-      return;
+    // Non-draw modes: a background click is empty space → drop the current selection.
+    if (selected !== null) setSelected(null);
+  }
+
+  function onMove(e: MouseEvent) {
+    const p = toImg(e);
+    if (dragging) {
+      setZones((cur) => {
+        const poly = cur[dragging.zone];
+        if (!poly) return cur;
+        const next = poly.slice();
+        next[dragging.vertexIdx] = p;
+        return { ...cur, [dragging.zone]: next };
+      });
+      setDirty(true);
     }
-    if (mode === 'delete') {
-      const containing = findContainingZone(zones, p);
-      if (containing) {
-        const next = { ...zones };
-        delete next[containing];
-        setZones(next);
-        setStatus(`Deleted zone "${containing}". Click Save to persist.`);
-      }
-    }
+    setCursor(p);
   }
 
-  function onMouseMove(e: MouseEvent<HTMLCanvasElement>) {
-    if (!dragging) return;
-    const p = canvasPoint(e);
-    setZones((cur) => {
-      const poly = cur[dragging.zone];
-      if (!poly) return cur;
-      const next = poly.slice();
-      next[dragging.vertexIdx] = p;
-      return { ...cur, [dragging.zone]: next };
-    });
+  function onUp() {
+    if (dragging) setDragging(null);
   }
 
-  function onMouseUp() {
-    setDragging(null);
-  }
-
-  function onDoubleClick() {
+  function onDbl() {
     if (mode !== 'draw') return;
     if (!pending || pending.length < 3) {
-      setStatus('Need at least 3 vertices.');
+      setStatus({ text: 'Need at least 3 vertices.', kind: 'err' });
       return;
     }
-    const name = window.prompt('Zone name?')?.trim();
-    if (!name) {
-      setStatus('Cancelled.');
-      setPending(null);
+    setNaming(true);
+    setNameInput('');
+  }
+
+  function onVertexDown(name: string, idx: number, e: MouseEvent) {
+    e.stopPropagation();
+    if (mode !== 'edit') return;
+    if (e.button === 2) {
+      e.preventDefault();
+      setZones((cur) => {
+        const poly = cur[name];
+        if (!poly || poly.length <= 3) {
+          setStatus({ text: 'A zone needs at least 3 vertices.', kind: 'err' });
+          return cur;
+        }
+        setDirty(true);
+        setStatus({ text: `Removed vertex from "${name}".`, kind: 'ok' });
+        return { ...cur, [name]: poly.filter((_, i) => i !== idx) };
+      });
       return;
     }
-    setZones({ ...zones, [name]: pending });
+    setDragging({ zone: name, vertexIdx: idx });
+    setSelected(name);
+  }
+
+  function onPolyClick(name: string) {
+    if (mode === 'delete') {
+      deleteZone(name);
+    } else if (mode === 'view' || mode === 'edit') {
+      setSelected(name);
+    }
+  }
+
+  function deleteZone(name: string) {
+    setZones((cur) => {
+      const next = { ...cur };
+      delete next[name];
+      return next;
+    });
+    setSelected((cur) => (cur === name ? null : cur));
+    setDirty(true);
+    setStatus({ text: `Deleted zone "${name}". Save to persist.`, kind: 'err' });
+  }
+
+  function onDeleteFromList(name: string, e: MouseEvent) {
+    e.stopPropagation();
+    deleteZone(name);
+  }
+
+  function confirmName() {
+    const raw = nameInput.trim();
+    if (!raw) {
+      setStatus({ text: 'Zone name required.', kind: 'err' });
+      return;
+    }
+    if (!pending || pending.length < 3) {
+      setStatus({ text: 'Need at least 3 vertices.', kind: 'err' });
+      return;
+    }
+    const name = raw.replace(/\s+/g, '_').toLowerCase();
+    setZones((cur) => ({ ...cur, [name]: pending }));
     setPending(null);
-    setStatus(`Added zone "${name}". Click Save to persist.`);
+    setNaming(false);
+    setSelected(name);
+    setDirty(true);
+    setStatus({ text: `Added zone "${name}". Save to persist.`, kind: 'ok' });
+  }
+
+  function cancelName() {
+    setNaming(false);
+    setStatus({ text: 'Cancelled. Pending shape kept — double-click to retry.', kind: 'pending' });
+  }
+
+  function onNameKey(e: KeyboardEvent) {
+    if (e.key === 'Enter') confirmName();
+    if (e.key === 'Escape') cancelName();
   }
 
   async function save() {
     try {
       zonesSchema.parse(zones);
-      await api.putZones(zones);
-      setStatus(`Saved ${Object.keys(zones).length} zone(s).`);
+      const res = await api.putZones(zones);
+      setDirty(false);
+      setStatus({ text: `Saved ${res.zones} zone(s) → PUT /api/zones · 200 OK.`, kind: 'ok' });
     } catch (err) {
-      setStatus(`Save failed: ${err}`);
+      setStatus({ text: `Save failed: ${err}`, kind: 'err' });
     }
   }
 
+  function refresh() {
+    void refreshSnapshot();
+    setStatus({ text: 'Fetched fresh snapshot.', kind: 'ok' });
+  }
+
   return (
-    <div className="panel zone-editor">
-      <div className="editor-toolbar">
-        <h3>Zone editor</h3>
-        <select value={mode} onChange={(e) => { setMode(e.target.value as Mode); setPending(null); }}>
-          <option value="view">View</option>
-          <option value="draw">Draw new</option>
-          <option value="edit">Edit vertices</option>
-          <option value="delete">Delete</option>
-        </select>
-        <button onClick={() => void refreshSnapshot()}>Refresh snapshot</button>
-        <button onClick={() => void save()}>Save</button>
-        <span className="muted">{status}</span>
+    <main className="cc-ze-main">
+      <div className="cc-ze-col-left">
+        <ZoneToolbar mode={mode} onMode={changeMode} onRefresh={refresh} onSave={() => void save()} />
+
+        <ZoneCanvas
+          svgRef={svgRef}
+          inputRef={inputRef}
+          meta={meta}
+          snapshotUrl={snapshotUrl}
+          zones={zones}
+          mode={mode}
+          selected={selected}
+          pending={pending}
+          cursor={cursor}
+          naming={naming}
+          nameInput={nameInput}
+          onBgDown={onBgDown}
+          onMove={onMove}
+          onUp={onUp}
+          onDbl={onDbl}
+          onPolyClick={onPolyClick}
+          onVertexDown={onVertexDown}
+          onNameInput={setNameInput}
+          onNameKey={onNameKey}
+          onConfirmName={confirmName}
+          onCancelName={cancelName}
+        />
+
+        <div className="cc-ze-status">
+          <span className="cc-ze-status-dot" style={{ background: STATUS_DOT[status.kind] }} />
+          <span className="cc-ze-status-text">{status.text}</span>
+          <span className="cc-ze-status-dirty">{dirty ? 'UNSAVED CHANGES' : 'ALL SAVED'}</span>
+        </div>
       </div>
-      <div className="canvas-wrap">
-        {meta ? (
-          <canvas
-            ref={canvasRef}
-            onContextMenu={(e) => e.preventDefault()}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onDoubleClick={onDoubleClick}
-          />
-        ) : (
-          <div className="muted">Waiting for first frame…</div>
-        )}
+
+      <div className="cc-ze-col-right">
+        <ZoneList
+          zones={zones}
+          selected={selected}
+          mode={mode}
+          onSelect={setSelected}
+          onDelete={onDeleteFromList}
+        />
+        <ZoneGuide mode={mode} />
       </div>
-      <ZoneListing zones={zones} />
-    </div>
+    </main>
   );
-}
-
-function ZoneListing({ zones }: { zones: ZonesMap }) {
-  const names = Object.keys(zones);
-  if (names.length === 0) return <div className="muted">No zones defined.</div>;
-  return (
-    <ul className="zone-list">
-      {names.map((n) => (
-        <li key={n}>
-          <strong>{n}</strong> <span className="muted">({zones[n].length} pts)</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function drawPolygon(
-  ctx: CanvasRenderingContext2D,
-  poly: Polygon,
-  label: string,
-  fill: string,
-  stroke: string,
-  showHandles: boolean = true,
-) {
-  if (poly.length === 0) return;
-  ctx.beginPath();
-  ctx.moveTo(poly[0][0], poly[0][1]);
-  for (let i = 1; i < poly.length; i++) {
-    ctx.lineTo(poly[i][0], poly[i][1]);
-  }
-  if (poly.length >= 3) ctx.closePath();
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  if (showHandles) {
-    ctx.fillStyle = stroke;
-    for (const [x, y] of poly) {
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  if (poly.length > 0) {
-    const [lx, ly] = poly[0];
-    ctx.fillStyle = '#fff';
-    ctx.font = '13px system-ui, sans-serif';
-    ctx.fillText(label, lx + 6, ly - 6);
-  }
 }

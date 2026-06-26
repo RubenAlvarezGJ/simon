@@ -39,3 +39,12 @@ export function findContainingZone(zones: Record<string, Polygon>, p: Point): st
   }
   return null;
 }
+
+/** Polygon area in px² via the shoelace formula. */
+export function polygonArea(poly: Polygon): number {
+  let a = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    a += poly[j][0] * poly[i][1] - poly[i][0] * poly[j][1];
+  }
+  return Math.abs(a / 2);
+}
