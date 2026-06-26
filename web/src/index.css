@@ -65,3 +65,4 @@ body {
   100% { box-shadow: 0 0 0 12px rgba(255, 77, 77, 0); }
 }
 @keyframes barflux { 0%, 100% { transform: scaleY(0.45); } 50% { transform: scaleY(1); } }
+@keyframes ants { to { stroke-dashoffset: -42; } }

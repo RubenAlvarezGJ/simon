@@ -55,12 +55,14 @@ export function ZoneCanvas({
 }: Props) {
   const vbW = meta?.width ?? 1920;
   const vbH = meta?.height ?? 1080;
-  const labelFont = Math.max(12, Math.round(vbH / 48));
-  const vertexR = Math.max(3, Math.round(vbH / 200));
+  // Crosshair reticle half-extents, scaled to the frame so handles stay legible.
+  const reticle = Math.max(5, Math.round(vbH / 200));
+  const hitR = Math.max(14, Math.round(vbH / 60));
+  const pendReticle = Math.max(4, Math.round(vbH / 220));
   const danger = mode === 'delete';
   const names = Object.keys(zones);
   const polyEvents = mode === 'view' || mode === 'delete';
-  const showHandlesFor = (name: string) => mode === 'edit' || name === selected;
+  const showHandlesFor = () => mode === 'edit';
 
   return (
     <div className="cc-ze-canvas">
@@ -126,23 +128,6 @@ export function ZoneCanvas({
             );
           })}
 
-          {/* zone labels — plain accent text anchored at the first vertex (matches LiveFeed) */}
-          {names.map((name) => {
-            const [lx, ly] = zones[name][0];
-            return (
-              <text
-                key={`${name}-label`}
-                className={`cc-ze-label-text${danger ? ' danger' : ''}`}
-                x={lx + 6}
-                y={ly - 8}
-                fontSize={labelFont}
-                pointerEvents="none"
-              >
-                ZONE · {name.toUpperCase()}
-              </text>
-            );
-          })}
-
           {/* pending polygon */}
           {pending && pending.length > 0 && (
             <>
@@ -150,6 +135,7 @@ export function ZoneCanvas({
                 <polyline
                   className="cc-ze-pending-line"
                   points={pending.map((p) => p.join(',')).join(' ')}
+                  vectorEffect="non-scaling-stroke"
                 />
                 <line
                   className="cc-ze-pending-cursor"
@@ -157,45 +143,58 @@ export function ZoneCanvas({
                   y1={pending[pending.length - 1][1]}
                   x2={cursor[0]}
                   y2={cursor[1]}
+                  vectorEffect="non-scaling-stroke"
                 />
               </g>
               {pending.map((p, i) => (
-                <circle
-                  key={i}
-                  className="cc-ze-pending-dot"
-                  cx={p[0]}
-                  cy={p[1]}
-                  r={vertexR}
-                  vectorEffect="non-scaling-stroke"
-                  pointerEvents="none"
-                />
+                <g key={i} pointerEvents="none">
+                  <line
+                    className="cc-ze-pending-reticle"
+                    x1={p[0] - pendReticle}
+                    y1={p[1]}
+                    x2={p[0] + pendReticle}
+                    y2={p[1]}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <line
+                    className="cc-ze-pending-reticle"
+                    x1={p[0]}
+                    y1={p[1] - pendReticle}
+                    x2={p[0]}
+                    y2={p[1] + pendReticle}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
               ))}
             </>
           )}
 
-          {/* vertex handles */}
+          {/* vertex handles — crosshair reticles with a transparent hit-circle */}
           {names.map((name) => {
-            if (!showHandlesFor(name)) return null;
+            if (!showHandlesFor()) return null;
             const sel = name === selected;
             return zones[name].map((p, idx) => {
               const cls = [
-                'cc-ze-vertex',
+                'cc-ze-reticle',
                 danger ? 'danger' : sel ? 'selected' : '',
               ]
                 .filter(Boolean)
                 .join(' ');
               return (
-                <circle
-                  key={`${name}-${idx}`}
-                  className={cls}
-                  cx={p[0]}
-                  cy={p[1]}
-                  r={vertexR}
-                  vectorEffect="non-scaling-stroke"
-                  pointerEvents="all"
-                  onMouseDown={(e) => onVertexDown(name, idx, e)}
-                  onContextMenu={(e) => e.preventDefault()}
-                />
+                <g key={`${name}-${idx}`}>
+                  <circle
+                    className="cc-ze-vertex-hit"
+                    cx={p[0]}
+                    cy={p[1]}
+                    r={hitR}
+                    fill="transparent"
+                    pointerEvents="all"
+                    onMouseDown={(e) => onVertexDown(name, idx, e)}
+                    onContextMenu={(e) => e.preventDefault()}
+                  />
+                  <line className={cls} x1={p[0] - reticle} y1={p[1]} x2={p[0] + reticle} y2={p[1]} pointerEvents="none" vectorEffect="non-scaling-stroke" />
+                  <line className={cls} x1={p[0]} y1={p[1] - reticle} x2={p[0]} y2={p[1] + reticle} pointerEvents="none" vectorEffect="non-scaling-stroke" />
+                </g>
               );
             });
           })}

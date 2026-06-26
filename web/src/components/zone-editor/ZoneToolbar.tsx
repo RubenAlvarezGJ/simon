@@ -41,10 +41,10 @@ export function ZoneToolbar({ mode, onMode, onRefresh, onSave }: Props) {
       })}
       <div className="cc-ze-toolbar-sep" />
       <button className="cc-ze-btn ghost" onClick={onRefresh}>
-        ⟳ REFRESH
+        REFRESH
       </button>
       <button className="cc-ze-btn primary" onClick={onSave}>
-        ↳ SAVE
+        SAVE
       </button>
     </div>
   );
