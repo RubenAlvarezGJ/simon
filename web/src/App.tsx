@@ -17,11 +17,7 @@ function Dashboard() {
 
       {tab === 'command' && <CommandCenter now={now} fps={fps} spark={spark} />}
       {tab === 'zones' && <ZoneEditor />}
-      {tab === 'rules' && (
-        <div className="cc-editor-page">
-          <RuleEditor />
-        </div>
-      )}
+      {tab === 'rules' && <RuleEditor />}
     </div>
   );
 }

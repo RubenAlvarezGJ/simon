@@ -1,354 +1,205 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, rulesPayloadSchema } from '../lib/api';
 import type { Condition, Rule, Severity, ZonesMap } from '../lib/types';
+import { RuleList } from './rule-editor/RuleList';
+import { RuleDetail } from './rule-editor/RuleDetail';
+import { ClassPalette } from './rule-editor/ClassPalette';
+import type { ZoneOption } from './rule-editor/ConditionCard';
+import { prettyZone } from './rule-editor/constants';
+import { conditionIsEmpty } from './rule-editor/summary';
+import type { EditorStatus } from './rule-editor/types';
 
-const SEVERITY_OPTIONS: Severity[] = ['low', 'high', 'critical'];
-
-const CLASS_OPTIONS: string[] = [
-  'person',
-  'bicycle',
-  'car',
-  'motorcycle',
-  'airplane',
-  'bus',
-  'train',
-  'truck',
-  'boat',
-  'traffic light',
-  'fire hydrant',
-  'stop sign',
-  'parking meter',
-  'bench',
-  'bird',
-  'cat',
-  'dog',
-  'horse',
-  'sheep',
-  'cow',
-  'elephant',
-  'bear',
-  'zebra',
-  'giraffe',
-  'backpack',
-  'umbrella',
-  'handbag',
-  'tie',
-  'suitcase',
-  'frisbee',
-  'skis',
-  'snowboard',
-  'sports ball',
-  'kite',
-  'baseball bat',
-  'baseball glove',
-  'skateboard',
-  'surfboard',
-  'tennis racket',
-  'bottle',
-  'wine glass',
-  'cup',
-  'fork',
-  'knife',
-  'spoon',
-  'bowl',
-  'banana',
-  'apple',
-  'sandwich',
-  'orange',
-  'broccoli',
-  'carrot',
-  'hot dog',
-  'pizza',
-  'donut',
-  'cake',
-  'chair',
-  'couch',
-  'potted plant',
-  'bed',
-  'dining table',
-  'toilet',
-  'tv',
-  'laptop',
-  'mouse',
-  'remote',
-  'keyboard',
-  'cell phone',
-  'microwave',
-  'oven',
-  'toaster',
-  'sink',
-  'refrigerator',
-  'book',
-  'clock',
-  'vase',
-  'scissors',
-  'teddy bear',
-  'hair drier',
-  'toothbrush',
-  'handgun',
-];
-
-const BLANK_CONDITION: Condition = {
-  class_name: null,
-  zone: null,
-  min_confidence: null,
-};
+const BLANK_CONDITION: Condition = { class_name: null, zone: null, min_confidence: null };
 
 function blankRule(): Rule {
-  return {
-    name: '',
-    description: '',
-    severity: 'high',
-    cooldown_seconds: 30,
-    conditions: [{ ...BLANK_CONDITION }],
-  };
+  return { name: '', description: '', severity: 'high', cooldown_seconds: 30, conditions: [{ ...BLANK_CONDITION }] };
+}
+
+function rulesValid(rules: Rule[]): boolean {
+  return (
+    rules.length > 0 &&
+    rules.every((r) => r.name.trim() !== '' && r.conditions.length > 0 && r.conditions.every((c) => !conditionIsEmpty(c)))
+  );
 }
 
 export function RuleEditor() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [zones, setZones] = useState<ZonesMap>({});
-  const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [draft, setDraft] = useState<Rule>(blankRule());
-  const [status, setStatus] = useState<string>('');
+  const [selected, setSelected] = useState<number | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [status, setStatus] = useState<EditorStatus>({ text: 'Loading rules from /api/rules…', kind: 'pending' });
+  const [pickerFor, setPickerFor] = useState<number | null>(null);
+  const [classSearch, setClassSearch] = useState('');
 
   useEffect(() => {
-    void api.getRules()
-      .then((rp) => setRules(rp.rules ?? []))
-      .catch((err) => setStatus(`Rules load failed: ${err}`));
-    void api.getZones()
+    void loadRules();
+    void api
+      .getZones()
       .then(setZones)
-      .catch((err) => setStatus(`Zones load failed: ${err}`));
+      .catch((err) => setStatus({ text: `Zones load failed: ${err}`, kind: 'err' }));
   }, []);
 
-  const zoneOptions = useMemo(() => ['global', ...Object.keys(zones)], [zones]);
-  const classOptions = CLASS_OPTIONS;
-
-  function startEdit(i: number) {
-    setEditIdx(i);
-    setDraft(JSON.parse(JSON.stringify(rules[i])));
+  async function loadRules() {
+    try {
+      const rp = await api.getRules();
+      const loaded = rp.rules ?? [];
+      setRules(loaded);
+      setSelected(loaded.length ? 0 : null);
+      setDirty(false);
+      setStatus({ text: `Loaded ${loaded.length} rule(s) from /api/rules.`, kind: 'ok' });
+    } catch (err) {
+      setStatus({ text: `Rules load failed: ${err}`, kind: 'err' });
+    }
   }
 
-  function startAdd() {
-    setEditIdx(-1);
-    setDraft(blankRule());
+  const zoneOptions = useMemo<ZoneOption[]>(
+    () => [
+      { value: '', label: 'Any zone' },
+      { value: 'global', label: 'Global · anywhere' },
+      ...Object.keys(zones).map((z) => ({ value: z, label: prettyZone(z) })),
+    ],
+    [zones],
+  );
+
+  const selectedRule = selected != null ? rules[selected] ?? null : null;
+  const valid = rulesValid(rules);
+
+  // ---- mutations (selected rule mutated in place) ----
+  function patchRule(patch: Partial<Rule>) {
+    setRules((cur) => {
+      if (selected == null || !cur[selected]) return cur;
+      const next = cur.slice();
+      next[selected] = { ...next[selected], ...patch };
+      return next;
+    });
+    setDirty(true);
   }
 
-  function cancelEdit() {
-    setEditIdx(null);
-    setDraft(blankRule());
+  function patchCondition(i: number, patch: Partial<Condition>) {
+    setRules((cur) => {
+      if (selected == null || !cur[selected]) return cur;
+      const next = cur.slice();
+      const r = { ...next[selected] };
+      const conds = r.conditions.slice();
+      conds[i] = { ...conds[i], ...patch };
+      r.conditions = conds;
+      next[selected] = r;
+      return next;
+    });
+    setDirty(true);
   }
 
-  function commitDraft() {
-    const next = rules.slice();
-    if (editIdx === null) return;
-    if (editIdx === -1) next.push(draft);
-    else next[editIdx] = draft;
-    setRules(next);
-    setEditIdx(null);
-    setDraft(blankRule());
+  function addCondition() {
+    setRules((cur) => {
+      if (selected == null || !cur[selected]) return cur;
+      const next = cur.slice();
+      const r = { ...next[selected] };
+      r.conditions = [...r.conditions, { ...BLANK_CONDITION }];
+      next[selected] = r;
+      return next;
+    });
+    setDirty(true);
   }
 
-  function deleteRule(i: number) {
-    const next = rules.slice();
-    next.splice(i, 1);
-    setRules(next);
+  function removeCondition(i: number) {
+    setRules((cur) => {
+      if (selected == null || !cur[selected]) return cur;
+      const r = cur[selected];
+      if (r.conditions.length <= 1) return cur;
+      const next = cur.slice();
+      next[selected] = { ...r, conditions: r.conditions.filter((_, j) => j !== i) };
+      return next;
+    });
+    setDirty(true);
   }
 
+  function addRule() {
+    setRules((cur) => {
+      const next = [...cur, blankRule()];
+      setSelected(next.length - 1);
+      return next;
+    });
+    setDirty(true);
+    setStatus({ text: 'New rule drafted — give it a name and a condition.', kind: 'pending' });
+  }
+
+  function deleteSelected() {
+    if (selected == null) return;
+    setRules((cur) => {
+      const name = cur[selected]?.name || 'untitled';
+      const next = cur.filter((_, j) => j !== selected);
+      setSelected(next.length === 0 ? null : Math.max(0, selected - 1));
+      setStatus({ text: `Deleted rule "${name}". Save to persist.`, kind: 'err' });
+      return next;
+    });
+    setDirty(true);
+  }
+
+  // ---- class picker ----
+  function pickClass(cls: string | null) {
+    if (pickerFor == null) return;
+    patchCondition(pickerFor, { class_name: cls });
+    setPickerFor(null);
+    setClassSearch('');
+  }
+
+  // ---- save / revert ----
   async function save() {
     try {
       const payload = { rules };
       rulesPayloadSchema.parse(payload);
       await api.putRules(payload);
-      setStatus(`Saved ${rules.length} rule(s).`);
+      setDirty(false);
+      setStatus({ text: `Saved ${rules.length} rule(s) → PUT /api/rules · 200 OK.`, kind: 'ok' });
     } catch (err) {
-      setStatus(`Validation/save failed: ${err}`);
+      setStatus({ text: `Save failed: ${err}`, kind: 'err' });
     }
   }
 
+  async function revert() {
+    await loadRules();
+  }
+
   return (
-    <div className="panel rule-editor">
-      <div className="editor-toolbar">
-        <h3>Rules</h3>
-        <button onClick={startAdd}>Add rule</button>
-        <button onClick={() => void save()} disabled={rules.length === 0}>Save</button>
-        <span className="muted">{status}</span>
-      </div>
+    <main className="cc-re-main">
+      <RuleList rules={rules} selected={selected} onSelect={setSelected} onAdd={addRule} />
 
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Severity</th>
-            <th>Cooldown</th>
-            <th>Conditions</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rules.map((r, i) => {
-            const sev = r.severity ?? 'high';
-            return (
-            <tr key={`${r.name}-${i}`}>
-              <td><strong>{r.name}</strong>{r.description && <div className="muted">{r.description}</div>}</td>
-              <td><span className={`badge ${sev}`}>{sev}</span></td>
-              <td>{r.cooldown_seconds}s</td>
-              <td>
-                {r.conditions.map((c, j) => (
-                  <div key={j} className="cond-row">
-                    {summariseCondition(c)}
-                  </div>
-                ))}
-              </td>
-              <td>
-                <button onClick={() => startEdit(i)}>Edit</button>
-                <button onClick={() => deleteRule(i)}>Delete</button>
-              </td>
-            </tr>
-            );
-          })}
-          {rules.length === 0 && (
-            <tr><td colSpan={5} className="muted">No rules yet.</td></tr>
-          )}
-        </tbody>
-      </table>
+      <RuleDetail
+        rule={selectedRule}
+        zoneOptions={zoneOptions}
+        status={status}
+        dirty={dirty}
+        valid={valid}
+        showPreview
+        onName={(v) => patchRule({ name: v })}
+        onDesc={(v) => patchRule({ description: v })}
+        onSeverity={(s: Severity) => patchRule({ severity: s })}
+        onCooldown={(v) => patchRule({ cooldown_seconds: v })}
+        onAddCondition={addCondition}
+        onRemoveCondition={removeCondition}
+        onZoneChange={(i, zone) => patchCondition(i, { zone })}
+        onOpenClass={(i) => {
+          setPickerFor(i);
+          setClassSearch('');
+        }}
+        onDelete={deleteSelected}
+        onRevert={() => void revert()}
+        onSave={() => void save()}
+        onAdd={addRule}
+      />
 
-      {editIdx !== null && (
-        <RuleForm
-          rule={draft}
-          onChange={setDraft}
-          classOptions={classOptions}
-          zoneOptions={zoneOptions}
-          onCommit={commitDraft}
-          onCancel={cancelEdit}
+      {pickerFor != null && (
+        <ClassPalette
+          current={selectedRule?.conditions[pickerFor]?.class_name ?? null}
+          search={classSearch}
+          onSearch={setClassSearch}
+          onPick={pickClass}
+          onClose={() => {
+            setPickerFor(null);
+            setClassSearch('');
+          }}
         />
       )}
-    </div>
-  );
-}
-
-function summariseCondition(c: Condition): string {
-  const parts: string[] = [];
-  if (c.class_name) parts.push(`class=${c.class_name}`);
-  if (c.zone) parts.push(`zone=${c.zone}`);
-  if (c.min_confidence != null) parts.push(`conf>=${c.min_confidence}`);
-  return parts.join(', ') || '(empty)';
-}
-
-interface FormProps {
-  rule: Rule;
-  onChange: (r: Rule) => void;
-  classOptions: string[];
-  zoneOptions: string[];
-  onCommit: () => void;
-  onCancel: () => void;
-}
-
-function RuleForm({ rule, onChange, classOptions, zoneOptions, onCommit, onCancel }: FormProps) {
-  function setCondition(i: number, patch: Partial<Condition>) {
-    const next = rule.conditions.slice();
-    next[i] = { ...next[i], ...patch };
-    onChange({ ...rule, conditions: next });
-  }
-  function addCondition() {
-    onChange({ ...rule, conditions: [...rule.conditions, { ...BLANK_CONDITION }] });
-  }
-  function removeCondition(i: number) {
-    const next = rule.conditions.slice();
-    next.splice(i, 1);
-    onChange({ ...rule, conditions: next });
-  }
-
-  return (
-    <div className="modal-card">
-      <h4>{rule.name ? `Edit "${rule.name}"` : 'New rule'}</h4>
-      <label>
-        Name
-        <input
-          value={rule.name}
-          onChange={(e) => onChange({ ...rule, name: e.target.value })}
-        />
-      </label>
-      <label>
-        Description
-        <input
-          value={rule.description ?? ''}
-          onChange={(e) => onChange({ ...rule, description: e.target.value })}
-        />
-      </label>
-      <label>
-        Severity
-        <select
-          value={rule.severity ?? 'high'}
-          onChange={(e) => onChange({ ...rule, severity: e.target.value as Severity })}
-        >
-          {SEVERITY_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Cooldown seconds
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={rule.cooldown_seconds}
-          onChange={(e) => onChange({ ...rule, cooldown_seconds: Number(e.target.value) })}
-        />
-      </label>
-
-      <h5>Conditions (ALL must match)</h5>
-      <ul className="cond-list">
-        {rule.conditions.map((c, i) => (
-          <li key={i} className="cond-edit">
-            <label>
-              Class
-              <input
-                list={`class-options-${i}`}
-                value={c.class_name ?? ''}
-                onChange={(e) => setCondition(i, { class_name: e.target.value || null })}
-                placeholder="(any)"
-              />
-              <datalist id={`class-options-${i}`}>
-                {classOptions.map((cn) => (
-                  <option key={cn} value={cn} />
-                ))}
-              </datalist>
-            </label>
-            <label>
-              Zone
-              <select
-                value={c.zone ?? ''}
-                onChange={(e) => setCondition(i, { zone: e.target.value || null })}
-              >
-                <option value="">(any)</option>
-                {zoneOptions.map((z) => (
-                  <option key={z} value={z}>{z}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Min conf
-              <input
-                type="number"
-                min={0}
-                max={1}
-                step={0.05}
-                value={c.min_confidence ?? ''}
-                onChange={(e) => setCondition(i, {
-                  min_confidence: e.target.value === '' ? null : Number(e.target.value),
-                })}
-              />
-            </label>
-            <button onClick={() => removeCondition(i)} disabled={rule.conditions.length === 1}>x</button>
-          </li>
-        ))}
-      </ul>
-      <button onClick={addCondition}>Add condition</button>
-      <div className="modal-actions">
-        <button onClick={onCommit} disabled={!rule.name.trim() || rule.conditions.length === 0}>OK</button>
-        <button onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
+    </main>
   );
 }
