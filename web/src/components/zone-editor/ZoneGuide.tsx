@@ -24,7 +24,6 @@ const GUIDES: Record<Mode, Guide> = {
     lines: [
       { key: 'CLICK', text: 'Place a vertex. Minimum 3 to form a polygon.' },
       { key: 'DBL', text: 'Double-click anywhere to close and name the zone.' },
-      { key: '3+', text: 'Dashed amber line previews the next edge.' },
     ],
   },
   edit: {
@@ -32,7 +31,6 @@ const GUIDES: Record<Mode, Guide> = {
     lines: [
       { key: 'DRAG', text: 'Grab any vertex handle to reshape a zone.' },
       { key: 'R-CLK', text: 'Right-click a vertex to remove it (min 3 kept).' },
-      { key: 'ALL', text: 'Every zone shows handles while editing.' },
     ],
   },
   delete: {

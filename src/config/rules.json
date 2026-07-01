@@ -12,6 +12,19 @@
           "min_confidence": null
         }
       ]
+    },
+    {
+      "name": "Car In Driveway",
+      "description": "",
+      "severity": "critical",
+      "cooldown_seconds": 30.0,
+      "conditions": [
+        {
+          "class_name": "car",
+          "zone": "car_zone",
+          "min_confidence": null
+        }
+      ]
     }
   ]
 }

@@ -219,6 +219,17 @@ export function ZoneEditor() {
 
   return (
     <main className="cc-ze-main">
+      <div className="cc-ze-col-right">
+        <ZoneList
+          zones={zones}
+          selected={selected}
+          mode={mode}
+          onSelect={setSelected}
+          onDelete={onDeleteFromList}
+        />
+        <ZoneGuide mode={mode} />
+      </div>
+
       <div className="cc-ze-col-left">
         <ZoneToolbar mode={mode} onMode={changeMode} onRefresh={refresh} onSave={() => void save()} />
 
@@ -251,17 +262,6 @@ export function ZoneEditor() {
           <span className="cc-ze-status-text">{status.text}</span>
           <span className="cc-ze-status-dirty">{dirty ? 'UNSAVED CHANGES' : 'ALL SAVED'}</span>
         </div>
-      </div>
-
-      <div className="cc-ze-col-right">
-        <ZoneList
-          zones={zones}
-          selected={selected}
-          mode={mode}
-          onSelect={setSelected}
-          onDelete={onDeleteFromList}
-        />
-        <ZoneGuide mode={mode} />
       </div>
     </main>
   );

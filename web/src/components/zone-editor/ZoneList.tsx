@@ -55,7 +55,7 @@ export function ZoneList({ zones, selected, mode, onSelect, onDelete }: Props) {
 
         {names.length === 0 && (
           <div className="cc-ze-empty">
-            <div className="cc-ze-empty-glyph">⬡</div>
+            <div className="cc-ze-empty-glyph">◇</div>
             <div className="cc-ze-empty-title">NO ZONES DEFINED</div>
             <div className="cc-ze-empty-sub">Switch to DRAW and click the snapshot to begin.</div>
           </div>

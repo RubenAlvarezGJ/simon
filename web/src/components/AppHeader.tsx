@@ -1,10 +1,10 @@
 import { useEventStreamContext } from '../context/EventStreamContext';
 import { formatClock, formatDate, formatUptime } from '../lib/format';
 
-export type Tab = 'command' | 'zones' | 'rules';
+export type Tab = 'home' | 'zones' | 'rules';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'command', label: 'Command' },
+  { id: 'home', label: 'Home' },
   { id: 'zones', label: 'Zones' },
   { id: 'rules', label: 'Rules' },
 ];
@@ -24,7 +24,7 @@ export function AppHeader({ tab, onTab, now, uptimeS }: Props) {
     <header className="cc-header">
       <div className="cc-header-left">
         <div className="cc-brand">
-          <span className="cc-brand-name">Surveillance Hub</span>
+          <span className="cc-brand-name">SIMON</span>
         </div>
         <nav className="cc-nav">
           {TABS.map((t) => (
@@ -40,10 +40,6 @@ export function AppHeader({ tab, onTab, now, uptimeS }: Props) {
       </div>
 
       <div className="cc-chips">
-        <div className="cc-chip">
-          <span className="cc-dot" style={{ background: 'var(--ok)' }} />
-          <span className="cc-chip-strong" style={{ color: 'var(--ok)' }}>ARMED</span>
-        </div>
         <div className="cc-chip">
           <span
             className="cc-dot"
@@ -68,7 +64,7 @@ export function AppHeader({ tab, onTab, now, uptimeS }: Props) {
         <div className="cc-divider" />
         <div className="cc-meta-block">
           <span className="cc-meta-name">R. ALVAREZ</span>
-          <span className="cc-meta-sub">OPERATOR</span>
+          {/*<span className="cc-meta-sub">OPERATOR</span>*/}
         </div>
       </div>
     </header>

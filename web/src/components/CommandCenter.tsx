@@ -13,13 +13,13 @@ interface Props {
 export function CommandCenter({ now, fps, spark }: Props) {
   return (
     <main className="cc-main">
-      <div className="cc-left">
-        <LiveFeed fps={fps} now={now} />
-        <TelemetryStrip fps={fps} spark={spark} />
-      </div>
       <div className="cc-rail">
         <ThreatPanel />
         <AlertLog />
+      </div>
+      <div className="cc-left">
+        <LiveFeed fps={fps} now={now} />
+        <TelemetryStrip fps={fps} spark={spark} />
       </div>
     </main>
   );

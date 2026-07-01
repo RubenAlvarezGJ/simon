@@ -78,7 +78,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 388px;
+  grid-template-columns: 388px 1fr;
   gap: 14px;
   padding: 14px 22px 18px;
 }
@@ -92,6 +92,10 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  aspect-ratio: 16 / 9;
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
   border: 1px solid var(--panel-border);
   border-radius: 5px;
   overflow: hidden;
@@ -339,7 +343,7 @@ input, select {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 348px;
+  grid-template-columns: 348px 1fr;
   gap: 14px;
   padding: 14px 22px 18px;
 }
