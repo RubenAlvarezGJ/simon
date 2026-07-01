@@ -12,8 +12,6 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from logic_layer.rule_evaluator import TriggeredAlert
 
-    from .overlay import OverlayBuffer
-
 
 logger = logging.getLogger(__name__)
 
@@ -91,23 +89,6 @@ class JsonlSink:
     @property
     def path(self) -> Path:
         return self._path
-
-
-# ---------------------------------------------------------------------------
-# OverlaySink
-# ---------------------------------------------------------------------------
-
-class OverlaySink:
-    """
-    Forwards alerts into an ``OverlayBuffer`` so the main thread can render
-    them onto the displayed video frame.
-    """
-
-    def __init__(self, buffer: "OverlayBuffer") -> None:
-        self._buffer = buffer
-
-    def deliver(self, alert: "TriggeredAlert") -> None:
-        self._buffer.push(alert)
 
 
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ import cv2
 import supervision as sv
 
 class YOLODetector:
-    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.7, device="cuda"):
+    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.6, device="cuda"):
         """
         Initializes the YOLO object detector.
 

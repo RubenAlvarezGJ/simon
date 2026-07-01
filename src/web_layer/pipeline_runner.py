@@ -12,8 +12,7 @@ from typing import Any, Callable, Optional
 import cv2
 
 from alert_layer.dispatcher import AlertDispatcher
-from alert_layer.overlay import OverlayBuffer, draw_overlay
-from alert_layer.sinks import ConsoleSink, JsonlSink, OverlaySink, TelegramSink, Sink
+from alert_layer.sinks import ConsoleSink, JsonlSink, TelegramSink, Sink
 from logic_layer.rule_evaluator import RuleEvaluator
 from logic_layer.spatial_engine import SpatialEngine
 from logic_layer.state_manager import ActiveThreats
@@ -151,12 +150,10 @@ class PipelineRunner:
         threat_registry = ActiveThreats()
         self._spatial_engine = SpatialEngine(zones_path=self._zones_path)
         self._rule_evaluator = RuleEvaluator(rules_path=self._rules_path)
-        overlay_buffer = OverlayBuffer(ttl_seconds=3.0)
 
         sinks: list[Sink] = [
             ConsoleSink(),
             JsonlSink(self._jsonl_path),
-            OverlaySink(overlay_buffer),
             BroadcastSink(self._state),
             TelegramSink(),
             *self._extra_sinks,
@@ -191,10 +188,7 @@ class PipelineRunner:
                 # 3. Alerts
                 dispatcher.dispatch(alerts)
 
-                # 4. Overlay
-                draw_overlay(annotated_frame, overlay_buffer)
-
-                # 5. Encode + publish
+                # 4. Encode + publish
                 ok, buf = cv2.imencode(
                     ".jpg",
                     annotated_frame,
@@ -207,7 +201,7 @@ class PipelineRunner:
                 h, w = annotated_frame.shape[:2]
                 self._state.publish_frame(jpeg_bytes, (h, w))
 
-                # 6. Replace ref-swap snapshots
+                # 5. Replace ref-swap snapshots
                 self._state.confirmed_snapshot = [t.to_dict() for t in confirmed]
                 self._state.pipeline_stats = dict(pipeline.stats)
                 self._state.dispatcher_stats = dict(dispatcher.stats)
