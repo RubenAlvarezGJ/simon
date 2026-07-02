@@ -27,8 +27,7 @@ src/web_layer/tests/
 
 web/node_modules/
 web/dist/
-src/config/*.bak
-src/config/*.tmp
+src/config/
 
 main.py
 test.py
