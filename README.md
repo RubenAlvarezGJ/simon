@@ -61,6 +61,23 @@ python server.py --source videos/clip.mp4 --host 0.0.0.0 --port 9000
 Then open http://127.0.0.1:9000. `--source` takes a camera index or a file path. `server.py`
 serves the built frontend from `web/dist` if it's present, so build the frontend first (below).
 
+### Build the frontend
+
+```bash
+cd web
+npm install
+npm run build      # bundles into web/dist, which server.py serves
+```
+
+### Frontend dev server (optional, hot reload)
+
+```bash
+cd web
+npm run dev
+```
+
+Run `server.py` alongside the dev server - Vite proxies `/api` → http://localhost:8000.
+
 ## Telegram notifications (optional)
 
 Simon can push alerts to a Telegram chat. This is optional though, without it the pipeline runs
@@ -107,19 +124,8 @@ Editor tab):
 | `high`     | Sent silently (no notification sound)    |
 | `critical` | Sent with an audible notification        |
 
-### Build the frontend
-
-```bash
-cd web
-npm install
-npm run build      # bundles into web/dist, which server.py serves
-```
-
-### Frontend dev server (optional, hot reload)
-
-```bash
-cd web
-npm run dev
-```
-
-Run `server.py` alongside the dev server - Vite proxies `/api` → http://localhost:8000.
+## Planned
+- Local storage of footage with 2 planned configurations:
+  - store all footage (segmented) 
+  - store footage containing a user defined rule (e.g. when a car is detected in the driveway)
+- Video playback interface
