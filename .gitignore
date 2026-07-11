@@ -4,6 +4,7 @@ env
 venv
 runs
 logs
+footage
 
 /videos
 /context
@@ -24,6 +25,8 @@ src/alert_layer/tests
 src/web_layer/__pycache__
 src/web_layer/routes/__pycache__
 src/web_layer/tests/
+
+src/recorder/__pycache__
 
 web/node_modules/
 web/dist/

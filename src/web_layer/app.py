@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from recorder.video_recorder import VideoRecorder
 from .pipeline_runner import PipelineRunner
 from .routes import events as events_routes
 from .routes import rules as rules_routes
@@ -25,11 +26,14 @@ logger = logging.getLogger(__name__)
 def create_app(
     source: str | int = 0,
     *,
+    footage_path: str | Path = "footage",
     zones_path: str | Path = "src/config/zones.json",
     rules_path: str | Path = "src/config/rules.json",
     jsonl_path: str | Path = "logs/alerts.jsonl",
     static_dir: str | Path | None = "web/dist",
+    autostart_recorder: bool = True,
     autostart_pipeline: bool = True,
+    recorder: Optional[VideoRecorder] = None,
     runner: Optional[PipelineRunner] = None,
 ) -> FastAPI:
     """Build the FastAPI app + wire up shared state and lifespan."""
@@ -44,6 +48,7 @@ def create_app(
         # the dispatcher worker thread via call_soon_threadsafe.
         runtime.event_loop = asyncio.get_running_loop()
 
+        # PipelineRunner setup
         nonlocal runner
         if autostart_pipeline and runner is None:
             runner = PipelineRunner(
@@ -61,17 +66,45 @@ def create_app(
             except Exception:
                 logger.exception("FastAPI lifespan: failed to start PipelineRunner")
 
+        # VideoRecorder setup. RTSP source required.
+        nonlocal recorder
+        if autostart_recorder and recorder is None:
+            if isinstance(source, str) and source.startswith(("rtsp://", "rtsps://")):
+                recorder = VideoRecorder(source=source, destination=footage_path)
+            else:
+                logger.info(
+                    "FastAPI lifespan: recorder autostart skipped; source %r is "
+                    "not an RTSP URL",
+                    source,
+                )
+        if recorder is not None:
+            app.state.recorder = recorder
+            try:
+                recorder.start()
+                logger.info("FastAPI lifespan: VideoRecorder started")
+            except Exception:
+                logger.exception("FastAPI lifespan: failed to start VideoRecorder")
+
         try:
             yield
         finally:
             logger.info("Lifespan shutting down")
             runtime.notify_shutdown()
-            r = getattr(app.state, "runner", None)
-            if r is not None:
+            rn = getattr(app.state, "runner", None)
+            rc = getattr(app.state, "recorder", None)
+
+            if rn is not None:
                 try:
-                    r.stop(timeout=5.0)
+                    rn.stop(timeout=5.0)
                 except Exception:
                     logger.exception("FastAPI lifespan: error stopping runner")
+
+            if rc is not None:
+                try:
+                    rc.stop()
+                except Exception:
+                    logger.exception("FastAPI lifespan: error stopping recorder")
+
             runtime.event_loop = None
 
     app = FastAPI(title="Threat Detector Command Center", lifespan=lifespan)
