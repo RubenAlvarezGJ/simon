@@ -48,6 +48,39 @@ def _parse_args() -> argparse.Namespace:
         help="Directory to serve as the SPA. Default: web/dist",
     )
     p.add_argument(
+        "--footage",
+        default="footage",
+        help="Directory holding recorded footage. Default: footage",
+    )
+    p.add_argument(
+        "--max-footage-gb",
+        type=float,
+        default=10.0,
+        help="Footage-directory size budget in GB (0 = unlimited). Default: 10",
+    )
+    p.add_argument(
+        "--footage-ttl-hours",
+        type=float,
+        default=24.0,
+        help="Delete footage older than this many hours (0 = no TTL). Default: 24",
+    )
+    p.add_argument(
+        "--footage-sweep-mins",
+        type=float,
+        default=1.0,
+        help=(
+            "Minutes between footage-cleanup sweeps. The size budget is only "
+            "enforced at sweep time, so footage can transiently exceed it by "
+            "about one segment per sweep interval; keep this at or below the "
+            "recorder's 60s segment duration. Default: 1"
+        ),
+    )
+    p.add_argument(
+        "--no-footage-cleanup",
+        action="store_true",
+        help="Disable the periodic footage-retention manager.",
+    )
+    p.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -75,14 +108,25 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
     from web_layer.app import create_app
+    from recorder.video_manager import RetentionConfig
     import uvicorn
+
+    retention_config = RetentionConfig(
+        footage_path=args.footage,
+        max_bytes=int(args.max_footage_gb * 1024 ** 3) if args.max_footage_gb > 0 else None,
+        ttl_seconds=args.footage_ttl_hours * 3600 if args.footage_ttl_hours > 0 else None,
+        sweep_interval_seconds=args.footage_sweep_mins * 60,
+    )
 
     app = create_app(
         source=_resolve_source(args.source),
+        footage_path=args.footage,
         zones_path=args.zones,
         rules_path=args.rules,
         jsonl_path=args.alerts_log,
         static_dir=args.static_dir,
+        autostart_manager=not args.no_footage_cleanup,
+        retention_config=retention_config,
     )
     runtime = app.state.runtime
 

@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from recorder.video_manager import RetentionConfig, VideoManager
 from recorder.video_recorder import VideoRecorder
 from .pipeline_runner import PipelineRunner
 from .routes import events as events_routes
@@ -33,8 +34,11 @@ def create_app(
     static_dir: str | Path | None = "web/dist",
     autostart_recorder: bool = True,
     autostart_pipeline: bool = True,
+    autostart_manager: bool = True,
+    retention_config: Optional[RetentionConfig] = None,
     recorder: Optional[VideoRecorder] = None,
     runner: Optional[PipelineRunner] = None,
+    video_manager: Optional[VideoManager] = None,
 ) -> FastAPI:
     """Build the FastAPI app + wire up shared state and lifespan."""
 
@@ -85,6 +89,21 @@ def create_app(
             except Exception:
                 logger.exception("FastAPI lifespan: failed to start VideoRecorder")
 
+        # VideoManager setup. Runs regardless of source type so pre-existing
+        # footage is pruned even when the recorder is not active.
+        nonlocal video_manager
+        if autostart_manager and video_manager is None:
+            video_manager = VideoManager(
+                retention_config or RetentionConfig(footage_path=footage_path)
+            )
+        if video_manager is not None:
+            app.state.video_manager = video_manager
+            try:
+                video_manager.start()
+                logger.info("FastAPI lifespan: VideoManager started")
+            except Exception:
+                logger.exception("FastAPI lifespan: failed to start VideoManager")
+
         try:
             yield
         finally:
@@ -92,6 +111,7 @@ def create_app(
             runtime.notify_shutdown()
             rn = getattr(app.state, "runner", None)
             rc = getattr(app.state, "recorder", None)
+            vm = getattr(app.state, "video_manager", None)
 
             if rn is not None:
                 try:
@@ -105,6 +125,12 @@ def create_app(
                 except Exception:
                     logger.exception("FastAPI lifespan: error stopping recorder")
 
+            if vm is not None:
+                try:
+                    vm.stop(timeout=5.0)
+                except Exception:
+                    logger.exception("FastAPI lifespan: error stopping video manager")
+
             runtime.event_loop = None
 
     app = FastAPI(title="Threat Detector Command Center", lifespan=lifespan)
@@ -113,6 +139,7 @@ def create_app(
     app.state.runtime = runtime
     app.state.zones_path = zones_path
     app.state.rules_path = rules_path
+    app.state.footage_path = Path(footage_path)
 
     # Routes
     app.include_router(stream_routes.router)

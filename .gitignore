@@ -27,6 +27,7 @@ src/web_layer/routes/__pycache__
 src/web_layer/tests/
 
 src/recorder/__pycache__
+src/recorder/tests
 
 web/node_modules/
 web/dist/
