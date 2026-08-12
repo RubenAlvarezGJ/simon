@@ -7,7 +7,7 @@ interface Props {
   now: Date;
 }
 
-const CAM_LABEL = 'CAM 01 — FRONT';
+const CAM_LABEL = 'CAM 01';
 
 export function LiveFeed({ fps, now }: Props) {
   const { connected, last_frame_id, hello } = useEventStreamContext();
@@ -96,12 +96,6 @@ export function LiveFeed({ fps, now }: Props) {
           })}
         </svg>
       )}
-
-      {/* corner brackets */}
-      <div className="cc-bracket tl" />
-      <div className="cc-bracket tr" />
-      <div className="cc-bracket bl" />
-      <div className="cc-bracket br" />
 
       {/* HUD overlays */}
       <div className="cc-hud-rec">

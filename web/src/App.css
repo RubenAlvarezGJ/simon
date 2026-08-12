@@ -135,13 +135,6 @@
   white-space: nowrap;
 }
 
-/* corner brackets */
-.cc-bracket { position: absolute; width: 20px; height: 20px; pointer-events: none; }
-.cc-bracket.tl { top: 8px; left: 8px; border-top: 2px solid rgba(255,255,255,.24); border-left: 2px solid rgba(255,255,255,.24); }
-.cc-bracket.tr { top: 8px; right: 8px; border-top: 2px solid rgba(255,255,255,.24); border-right: 2px solid rgba(255,255,255,.24); }
-.cc-bracket.bl { bottom: 8px; left: 8px; border-bottom: 2px solid rgba(255,255,255,.24); border-left: 2px solid rgba(255,255,255,.24); }
-.cc-bracket.br { bottom: 8px; right: 8px; border-bottom: 2px solid rgba(255,255,255,.24); border-right: 2px solid rgba(255,255,255,.24); }
-
 /* HUD overlays */
 .cc-hud-rec { position: absolute; top: 13px; left: 16px; display: flex; align-items: center; gap: 9px; }
 .cc-hud-rec .dot { width: 9px; height: 9px; border-radius: 50%; }
