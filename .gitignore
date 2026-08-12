@@ -6,6 +6,7 @@ runs
 logs
 footage
 
+/__pycache__
 /videos
 /context
 /scripts
