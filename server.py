@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Threat Detector web command center")
+    p = argparse.ArgumentParser(description="Simon's web interface")
     p.add_argument(
         "--source",
         default="0",
