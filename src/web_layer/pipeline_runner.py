@@ -59,8 +59,7 @@ class PipelineRunner:
       2. pulls one (annotated_frame, detections) tuple per iteration;
       3. drives ActiveThreats -> SpatialEngine -> RuleEvaluator;
       4. dispatches alerts to all sinks (including BroadcastSink);
-      5. draws the OverlaySink banner onto the annotated frame;
-      6. JPEG-encodes the annotated frame once and publishes it to
+      5. JPEG-encodes the annotated frame once and publishes it to
          ``RuntimeState`` so all MJPEG subscribers share the same bytes.
     """
 
