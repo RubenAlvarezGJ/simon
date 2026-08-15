@@ -2,20 +2,23 @@ from ultralytics import YOLO
 import cv2
 import supervision as sv
 
+from src.cv_layer.device import resolve_device
+
 class YOLODetector:
-    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.6, device="cuda"):
+    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.6, device: str | None = None):
         """
         Initializes the YOLO object detector.
 
         Parameters:
             model_path (str): Path to the YOLO model weights.
             confidence_threshold (float): Minimum confidence score to accept a detection.
-            device (str): Inference device — 'cuda' for GPU, 'cpu' for CPU.
+            device (str | None): Inference device. None or 'auto' resolves to 'cuda'
+                when available and 'cpu' otherwise.
         """
         self.model = YOLO(model_path)
         self.confidence_threshold = confidence_threshold
-        self.device = device
-        self.model.to(device) # move model to gpu
+        self.device = resolve_device(device)
+        self.model.to(self.device)  # move model to the resolved device
 
         self.box_annotator = sv.BoxAnnotator(color=sv.Color.RED, thickness=1)
         self.label_annotator = sv.LabelAnnotator(color=sv.Color.RED, text_color=sv.Color.BLACK)
