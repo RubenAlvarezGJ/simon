@@ -1,0 +1,5 @@
+# Host-side development only. Never installed into an image.
+-r base.txt
+pytest==9.0.3
+pytest-asyncio==1.3.0
+roboflow==1.3.6

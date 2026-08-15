@@ -1,0 +1,16 @@
+# Direct runtime dependencies, hardware-neutral.
+# torch/torchvision are NOT here - they come from a per-target file so the same
+# base.txt installs on x86 CUDA, x86 CPU, and Jetson aarch64.
+#
+# Versions are the ones proven working in the Python 3.13 dev venv. If a pin has
+# no cp310 wheel it will fail loudly at Jetson build time; relax that single pin
+# then rather than loosening everything pre-emptively.
+fastapi==0.136.1
+numpy==2.2.6
+opencv-python-headless==4.13.0.92
+pydantic==2.13.4
+python-dotenv==1.2.2
+requests==2.32.5
+supervision==0.27.0.post2
+ultralytics==8.3.253
+uvicorn==0.47.0

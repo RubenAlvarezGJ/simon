@@ -1,0 +1,6 @@
+# x86_64, no GPU. The CPU index avoids pulling ~2GB of unused CUDA libraries.
+--index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+# After the first successful build, pin what pip resolved:
+#   docker compose run --rm --entrypoint pip <service> freeze | grep -Ei "^torch"
