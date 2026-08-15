@@ -16,6 +16,7 @@ pytest.ini
 src/cv_layer/__pycache__
 src/cv_layer/detector/__pycache__
 src/cv_layer/pipeline/__pycache__
+src/cv_layer/tests
 
 src/logic_layer/__pycache__
 src/logic_layer/tests
