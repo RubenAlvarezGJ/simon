@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 import cv2
@@ -28,13 +29,25 @@ DetectorFactory = Callable[[], Any]
 PipelineFactory = Callable[[Any], Any]
 
 
-def _default_detector_factory() -> Any:
-    """Construct the production AdaptiveDetector with CUDA when available."""
-    import torch
-    from cv_layer.detector.adaptive_detector import AdaptiveDetector
+def _default_detector_factory(
+    model_path: str | Path,
+    device: str | None,
+) -> DetectorFactory:
+    """Return a factory that builds the production AdaptiveDetector.
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    return AdaptiveDetector("models/yolo11s.pt", device=device)
+    Mirrors _default_pipeline_factory: configuration is captured here, and the
+    returned callable takes no arguments so the runner's call site is unchanged.
+    Model loading stays inside the callable so it happens on the worker thread.
+    """
+
+    def _build() -> Any:
+        from cv_layer.detector.adaptive_detector import AdaptiveDetector
+        from cv_layer.device import resolve_device, resolve_model_path
+
+        weights = resolve_model_path(model_path)
+        return AdaptiveDetector(str(weights), device=resolve_device(device))
+
+    return _build
 
 
 def _default_pipeline_factory(
@@ -71,6 +84,8 @@ class PipelineRunner:
         zones_path: str = "src/config/zones.json",
         rules_path: str = "src/config/rules.json",
         jsonl_path: str = "logs/alerts.jsonl",
+        model_path: str | Path = "models/yolo11s.pt",
+        device: str | None = None,
         jpeg_quality: int = 80,
         drop_frames_if_full: bool = True,
         detector_factory: Optional[DetectorFactory] = None,
@@ -84,7 +99,9 @@ class PipelineRunner:
         self._jsonl_path = jsonl_path
         self._jpeg_quality = jpeg_quality
 
-        self._detector_factory = detector_factory or _default_detector_factory
+        self._detector_factory = detector_factory or _default_detector_factory(
+            model_path, device
+        )
         self._pipeline_factory = pipeline_factory or _default_pipeline_factory(
             source, drop_frames_if_full
         )
