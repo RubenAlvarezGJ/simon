@@ -36,7 +36,7 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--device",
-        default=os.getenv("SIMON_DEVICE", "auto"),
+        default=os.getenv("SIMON_DEVICE", "auto").strip().lower(),
         help=(
             "Inference device: 'auto', 'cpu', or 'cuda'. Env: SIMON_DEVICE. "
             "Default: auto"
@@ -121,11 +121,36 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--log-level",
-        default=os.getenv("SIMON_LOG_LEVEL", "INFO"),
+        # argparse validates `choices=` only against an explicitly-passed CLI
+        # value, never against `default=`. Upper-casing here makes the natural
+        # lowercase spelling in a compose file (SIMON_LOG_LEVEL=debug) match
+        # the choices instead of silently reaching getattr(logging, "debug")
+        # later, which returns a function rather than an int. An env value
+        # that still isn't a real level (e.g. "TRACE") is caught defensively
+        # in main() via _resolve_log_level rather than crashing.
+        default=os.getenv("SIMON_LOG_LEVEL", "INFO").upper(),
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level. Env: SIMON_LOG_LEVEL. Default: INFO",
     )
     return p.parse_args()
+
+
+def _resolve_log_level(name: str) -> tuple[int, bool]:
+    """Map a level name to a logging level int, defaulting to INFO.
+
+    `--log-level` has `choices=`, but that only validates an explicit CLI
+    flag -- the value computed from SIMON_LOG_LEVEL reaches here as a
+    `default=` and bypasses that check entirely (e.g. an unrecognized value
+    like "TRACE"). Bypass Mode: degrade to INFO and make it visible via a
+    warning rather than raising a confusing TypeError/AttributeError out of
+    logging.basicConfig.
+
+    Returns (level, used_fallback).
+    """
+    level = getattr(logging, name, None)
+    if isinstance(level, int):
+        return level, False
+    return logging.INFO, True
 
 
 def _resolve_source(raw: str) -> str | int:
@@ -137,10 +162,17 @@ def _resolve_source(raw: str) -> str | int:
 
 def main() -> int:
     args = _parse_args()
+    log_level, log_level_is_fallback = _resolve_log_level(args.log_level)
     logging.basicConfig(
-        level=getattr(logging, args.log_level),
+        level=log_level,
         format="%(asctime)s %(levelname)s %(name)s | %(message)s",
     )
+    if log_level_is_fallback:
+        logging.getLogger(__name__).warning(
+            "Unrecognized log level %r (from --log-level / SIMON_LOG_LEVEL); "
+            "falling back to INFO.",
+            args.log_level,
+        )
 
     # Make `from src.web_layer.app import create_app` work alongside the
     # `pythonpath = src` test setup.
