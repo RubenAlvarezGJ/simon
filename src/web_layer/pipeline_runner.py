@@ -45,7 +45,17 @@ def _default_detector_factory(
         from cv_layer.device import resolve_device, resolve_model_path
 
         weights = resolve_model_path(model_path)
-        return AdaptiveDetector(str(weights), device=resolve_device(device))
+        resolved_device = resolve_device(device)
+        # Single authoritative "what did we actually load" line. Deliberately
+        # here rather than inside YOLODetector: with --device cuda on a
+        # CPU-only host resolve_device() runs a second time inside
+        # YOLODetector too, and logging from the factory keeps this to one
+        # line instead of duplicating it. On the gpu compose service
+        # SIMON_DEVICE defaults to "auto", so without this line a missing
+        # NVIDIA container toolkit silently falls back to a few-FPS CPU run
+        # with no log evidence at all.
+        logger.info("Detector: weights=%s device=%s", weights, resolved_device)
+        return AdaptiveDetector(str(weights), device=resolved_device)
 
     return _build
 
