@@ -2,4 +2,15 @@
 -r base.txt
 pytest==9.0.3
 pytest-asyncio==1.3.0
-roboflow==1.3.6
+# httpx is not declared anywhere by name, but fastapi.testclient.TestClient
+# imports it at module import time, and seven test files use TestClient. It's
+# only offered via fastapi's 'standard' extra and starlette's 'full' extra,
+# neither of which base.txt installs, so it must be pinned directly or a clean
+# dev install cannot run the suite.
+httpx==0.28.1
+
+# roboflow is NOT installed here. scripts/ (git-ignored, dev-only) needs it,
+# but roboflow==1.3.6 hard-pins opencv-python-headless==4.10.0.84, which
+# conflicts with the ==4.13.0.92 pin in base.txt -- two == pins on the same
+# distribution is an unresolvable ResolutionImpossible. Install roboflow into
+# a separate virtualenv when working on scripts/.

@@ -2,9 +2,14 @@
 # torch/torchvision are NOT here - they come from a per-target file so the same
 # base.txt installs on x86 CUDA, x86 CPU, and Jetson aarch64.
 #
-# Versions are the ones proven working in the Python 3.13 dev venv. If a pin has
-# no cp310 wheel it will fail loudly at Jetson build time; relax that single pin
-# then rather than loosening everything pre-emptively.
+# Versions are the ones proven working in the Python 3.13 dev venv, with one
+# exception: opencv-python-headless==4.13.0.92 is not what the venv has
+# installed (that's 4.10.0.84) - it was copied over from the opencv-python line
+# of the old requirements.txt freeze. It's kept anyway because headless
+# publishes the same version numbers as opencv-python and 4.13.0.92 matches the
+# opencv-python build the venv actually runs. If a pin has no cp310 wheel it
+# will fail loudly at Jetson build time; relax that single pin then rather than
+# loosening everything pre-emptively.
 fastapi==0.136.1
 numpy==2.2.6
 opencv-python-headless==4.13.0.92
@@ -14,3 +19,10 @@ requests==2.32.5
 supervision==0.27.0.post2
 ultralytics==8.3.253
 uvicorn==0.47.0
+# websockets is not imported anywhere in src/ - it's a runtime protocol
+# dependency that uvicorn needs to serve WebSocket routes (see
+# src/web_layer/routes/events.py). uvicorn only declares it under its
+# 'standard' extra, which base.txt deliberately does not pull in (that extra
+# also drags in uvloop/httptools/watchfiles), so it must be pinned directly.
+# Do not remove this thinking it's unused - it has no import statement to grep for.
+websockets==16.0
