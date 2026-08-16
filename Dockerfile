@@ -3,8 +3,9 @@
 # BASE_IMAGE must be declared before the first FROM to be usable in a FROM line.
 # Intentionally left floating (unlike the node stage below): this image never
 # regenerates a lockfile, so a patch bump here can't desync anything the way an
-# npm version shift can. Pinning it would also have to be mirrored into Task 7's
-# compose BASE_IMAGE args for two services, for no matching benefit.
+# npm version shift can. Pinning it would also have to be mirrored into
+# docker-compose.yml's BASE_IMAGE build arg for both the cpu and gpu services,
+# for no matching benefit.
 ARG BASE_IMAGE=python:3.13-slim
 
 # ---------------------------------------------------------------------------
@@ -16,9 +17,12 @@ ARG BASE_IMAGE=python:3.13-slim
 # npm minors), which desyncs web/package-lock.json against whatever `npm ci`
 # happens to run inside. This digest is the exact node:24-alpine image
 # web/package-lock.json was generated inside, so the pin and the lock are
-# consistent by construction. Bumping this digest means regenerating
-# web/package-lock.json inside the new image first (see Task 6 report for the
-# exact command), not just editing this line.
+# consistent by construction. Bumping this digest means regenerating the lockfile
+# inside the new image first, not just editing this line — e.g.
+#   docker run --rm -v "$(pwd)/web:/web" -w /web node:24-alpine@<new-digest> \
+#     sh -c "npm install --package-lock-only --no-audit --no-fund"
+# so the lock is generated with the exact npm the new digest ships, then commit
+# both the new digest and the regenerated web/package-lock.json together.
 FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS web
 WORKDIR /web
 
