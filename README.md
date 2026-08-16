@@ -127,6 +127,17 @@ npm install
 npm run build      # bundles into web/dist, which server.py serves
 ```
 
+**Careful with `npm install` here.** The container build runs `npm ci` inside a specific
+digest-pinned `node:24-alpine` image (see the `Dockerfile`'s stage-1 comment) — that pin exists
+because npm's resolution of vite/rolldown's optional WASM peer-dependency bindings has drifted
+across npm versions before, silently desyncing `web/package-lock.json` from whatever `npm ci`
+runs inside. Running `npm install` on the host with a different local Node/npm version can
+rewrite `web/package-lock.json` in a way that no longer matches that pinned image, and
+`npm ci` (which refuses to deviate from the lockfile) then fails inside the container build.
+If you touch dependencies, regenerate the lockfile inside the pinned image itself rather than
+with your host npm — see the `Dockerfile` comment for the exact command — and commit the
+lockfile change alongside any digest bump.
+
 ### Frontend dev server (optional, hot reload)
 
 ```bash
@@ -223,9 +234,11 @@ Docker creates them as `root`-owned directories on first use.
 
 If you want Telegram alerts, create the `.env` file described above
 ([Telegram notifications](#telegram-notifications-optional)) in the project root first —
-`docker-compose.yml` references it via `env_file: .env`, which injects it into the container
-**at start time only**. `.env` is listed in `.dockerignore`, so it is never copied into an image
-layer or baked into anything you'd `docker push`.
+`docker-compose.yml` references it via `env_file: [{path: .env, required: false}]`, which
+injects it into the container **at start time only** and is genuinely optional: `.env` absent
+is fine and `docker compose up` still starts (Telegram alerts just stay inert). `.env` is also
+listed in `.dockerignore`, so even when present it is never copied into an image layer or baked
+into anything you'd `docker push`.
 
 ### Build and run
 
@@ -267,11 +280,13 @@ compose service's `command:` instead.
 
 **Set `SIMON_*` variables as real environment variables — not in `.env`.** `docker-compose.yml`'s
 `environment:` block (as shown above) works correctly; putting a `SIMON_*` value only in `.env`
-does not. Only `TelegramSink` calls `load_dotenv()`, and it does so lazily, on the alert-dispatch
-worker thread, well after `server.py`'s argument parsing has already read every `SIMON_*` default
-from the environment via `os.getenv(...)`. A `SIMON_*` value that exists only in `.env` is never
-seen. `TELEGRAM_BOT_TOKEN` / `CHAT_ID` don't have this problem — they're the only two variables
-`TelegramSink` itself reads, so `.env` is exactly where they belong.
+does not. Only `TelegramSink` calls `load_dotenv()`, and it does so lazily, in its `__init__`
+(constructed on the **`PipelineRunner`** worker thread, not the alert-dispatch worker thread —
+`AlertDispatcher` just fans already-built sinks out to `deliver()`), well after `server.py`'s
+argument parsing has already read every `SIMON_*` default from the environment via
+`os.getenv(...)`. A `SIMON_*` value that exists only in `.env` is never seen. `TELEGRAM_BOT_TOKEN`
+/ `CHAT_ID` don't have this problem — they're the only two variables `TelegramSink` itself reads,
+so `.env` is exactly where they belong.
 
 ### Networking gotchas
 
