@@ -49,10 +49,10 @@ source venv/bin/activate    # macOS/Linux
 
 ### 4. Install PyTorch
 
-There's no single `requirements.txt` pinning a PyTorch build anymore — dependencies live in a
-per-hardware-target `requirements/` directory, and the two torch files simply point at PyTorch's
-own package index with an unpinned `torch`/`torchvision`, so pip resolves whatever build that
-index currently serves for your platform. Pick one:
+Dependencies live in a `requirements/` directory split by hardware target, so PyTorch is
+installed on its own rather than through one combined file. The two torch files point at
+PyTorch's package index with `torch`/`torchvision` left unpinned, letting pip resolve the build
+that index serves for your platform. Pick one:
 
 **NVIDIA GPU (CUDA):**
 
@@ -127,16 +127,16 @@ npm install
 npm run build      # bundles into web/dist, which server.py serves
 ```
 
-**Careful with `npm install` here.** The container build runs `npm ci` inside a specific
-digest-pinned `node:24-alpine` image (see the `Dockerfile`'s stage-1 comment) — that pin exists
-because npm's resolution of vite/rolldown's optional WASM peer-dependency bindings has drifted
-across npm versions before, silently desyncing `web/package-lock.json` from whatever `npm ci`
-runs inside. Running `npm install` on the host with a different local Node/npm version can
-rewrite `web/package-lock.json` in a way that no longer matches that pinned image, and
-`npm ci` (which refuses to deviate from the lockfile) then fails inside the container build.
-If you touch dependencies, regenerate the lockfile inside the pinned image itself rather than
-with your host npm — see the `Dockerfile` comment for the exact command — and commit the
-lockfile change alongside any digest bump.
+**Careful with `npm install` here.** The container build runs `npm ci` inside a digest-pinned
+`node:24-alpine` image. That pin exists because npm resolves the optional per-platform WASM
+bindings vite/rolldown depend on differently between npm versions, so a `web/package-lock.json`
+written by one npm can fail `npm ci` under another.
+
+Running `npm install` with your host's npm can rewrite the lockfile into a form the pinned image
+rejects, which breaks the container build even though everything still works locally. If you
+change frontend dependencies, regenerate the lockfile inside the pinned image instead — the
+`Dockerfile`'s stage-1 comment has the exact command — and commit it together with any digest
+change.
 
 ### Frontend dev server (optional, hot reload)
 
@@ -278,15 +278,13 @@ unlike every other flag above, it's a plain on/off switch with no environment ba
 container can't turn footage retention off through `environment:`; you'd have to override the
 compose service's `command:` instead.
 
-**Set `SIMON_*` variables as real environment variables — not in `.env`.** `docker-compose.yml`'s
-`environment:` block (as shown above) works correctly; putting a `SIMON_*` value only in `.env`
-does not. Only `TelegramSink` calls `load_dotenv()`, and it does so lazily, in its `__init__`
-(constructed on the **`PipelineRunner`** worker thread, not the alert-dispatch worker thread —
-`AlertDispatcher` just fans already-built sinks out to `deliver()`), well after `server.py`'s
-argument parsing has already read every `SIMON_*` default from the environment via
-`os.getenv(...)`. A `SIMON_*` value that exists only in `.env` is never seen. `TELEGRAM_BOT_TOKEN`
-/ `CHAT_ID` don't have this problem — they're the only two variables `TelegramSink` itself reads,
-so `.env` is exactly where they belong.
+**Set `SIMON_*` variables as real environment variables — not in `.env`.** The `environment:`
+block shown above works; a `SIMON_*` value placed only in `.env` does not.
+
+`.env` is loaded by `TelegramSink`, which is constructed once the pipeline starts. By then
+`server.py` has already read every `SIMON_*` default straight from the process environment, so
+anything living only in `.env` arrives too late to be seen. `TELEGRAM_BOT_TOKEN` and `CHAT_ID`
+are unaffected — `TelegramSink` reads those itself, which is exactly what `.env` is for.
 
 ### Networking gotchas
 
@@ -308,13 +306,13 @@ so `.env` is exactly where they belong.
   design (look for the startup log line `recorder autostart skipped; source '...' is not an RTSP
   URL` to confirm this is what happened, not a failure).
 - **A file-path source eventually flips the container `unhealthy` — this is expected.** The
-  healthcheck asserts the `pipeline_running` field in `/api/health`, not just an HTTP 200
-  (`/api/health` returns 200 even when the detector thread has died, e.g. from a bad `SIMON_MODEL`
-  path, so a status-only check could never catch that). When a file source hits end-of-stream the
-  pipeline legitimately stops and `pipeline_running` goes `false`; a production RTSP source
-  doesn't end, so this only shows up with file sources. Also note the pipeline decodes a file as
-  fast as the queue allows rather than at the file's real playback rate, so a clip finishes in a
-  fraction of its nominal duration.
+  healthcheck reads the `pipeline_running` field from `/api/health` rather than settling for an
+  HTTP 200, because that endpoint answers 200 whenever the web server is up, including when the
+  detector thread has died from something like a bad `SIMON_MODEL` path. A file source that
+  reaches the end of the stream stops the pipeline legitimately, so `pipeline_running` goes
+  `false` and the container is marked unhealthy. An RTSP source never ends, so this is specific
+  to files. Note too that the pipeline decodes a file as fast as the queue allows rather than at
+  playback speed, so a clip finishes in a fraction of its running time.
 - **Host port 8000 may already be bound by something else** on your machine (a VPN client, WSL
   port-forwarding, another service). If `docker compose up` fails to bind the port, remap the host
   side in `docker-compose.yml`, e.g. `"8001:8000"`.

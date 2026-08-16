@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 
+# Must precede any cv2 import; OpenCV reads this when its FFmpeg backend loads.
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
 import argparse
@@ -39,12 +40,8 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--device",
-        # Kept here too (belt-and-suspenders with the argparse `choices=`-less
-        # env path for readability/log clarity), but this is no longer the
-        # only place normalization happens: resolve_device() itself
-        # (src/cv_layer/device.py) also normalizes case/whitespace now, so
-        # the CLI flag path (`--device CUDA`) -- which argparse does NOT run
-        # through this `default=` expression -- is covered too.
+        # Canonicalized for --help and logs; resolve_device() normalizes the
+        # CLI flag, which never passes through this expression.
         default=os.getenv("SIMON_DEVICE", "auto").strip().lower(),
         help=(
             "Inference device: 'auto', 'cpu', or 'cuda'. Env: SIMON_DEVICE. "
@@ -130,13 +127,8 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--log-level",
-        # argparse validates `choices=` only against an explicitly-passed CLI
-        # value, never against `default=`. Upper-casing here makes the natural
-        # lowercase spelling in a compose file (SIMON_LOG_LEVEL=debug) match
-        # the choices instead of silently reaching getattr(logging, "debug")
-        # later, which returns a function rather than an int. An env value
-        # that still isn't a real level (e.g. "TRACE") is caught defensively
-        # in main() via _resolve_log_level rather than crashing.
+        # Upper-cased so a lowercase env value still matches `choices`, which
+        # argparse applies only to command-line arguments.
         default=os.getenv("SIMON_LOG_LEVEL", "INFO").upper(),
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level. Env: SIMON_LOG_LEVEL. Default: INFO",
@@ -147,12 +139,9 @@ def _parse_args() -> argparse.Namespace:
 def _resolve_log_level(name: str) -> tuple[int, bool]:
     """Map a level name to a logging level int, defaulting to INFO.
 
-    `--log-level` has `choices=`, but that only validates an explicit CLI
-    flag -- the value computed from SIMON_LOG_LEVEL reaches here as a
-    `default=` and bypasses that check entirely (e.g. an unrecognized value
-    like "TRACE"). Bypass Mode: degrade to INFO and make it visible via a
-    warning rather than raising a confusing TypeError/AttributeError out of
-    logging.basicConfig.
+    A value from SIMON_LOG_LEVEL bypasses argparse's ``choices``, so an
+    unrecognized name reaches this function. Degrading to INFO keeps the
+    pipeline running instead of raising out of ``logging.basicConfig``.
 
     Returns (level, used_fallback).
     """
@@ -216,13 +205,8 @@ def main() -> int:
         app,
         host=args.host,
         port=args.port,
-        # Pass the *resolved* level (already degraded to INFO above when
-        # unrecognized), not args.log_level raw. uvicorn's Config.__init__
-        # does LOG_LEVELS[self.log_level.lower()] with no fallback of its own
-        # -- an unrecognized name (e.g. SIMON_LOG_LEVEL=verbose, which
-        # bypasses argparse `choices=` via `default=`) would raise an
-        # uncaught KeyError here and, under compose's `restart:
-        # unless-stopped`, crash-loop forever.
+        # Resolved level, not the raw argument: uvicorn looks the name up with
+        # no fallback of its own and raises KeyError on anything unrecognized.
         log_level=logging.getLevelName(log_level).lower(),
         timeout_graceful_shutdown=5,
     )

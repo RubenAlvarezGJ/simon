@@ -35,9 +35,10 @@ def _default_detector_factory(
 ) -> DetectorFactory:
     """Return a factory that builds the production AdaptiveDetector.
 
-    Mirrors _default_pipeline_factory: configuration is captured here, and the
-    returned callable takes no arguments so the runner's call site is unchanged.
-    Model loading stays inside the callable so it happens on the worker thread.
+    Follows the same shape as _default_pipeline_factory: configuration is
+    captured here, and the returned callable takes no arguments so the runner
+    can invoke it directly. Model loading stays inside that callable, which is
+    what keeps it on the worker thread rather than the caller's.
     """
 
     def _build() -> Any:
@@ -46,14 +47,10 @@ def _default_detector_factory(
 
         weights = resolve_model_path(model_path)
         resolved_device = resolve_device(device)
-        # Single authoritative "what did we actually load" line. Deliberately
-        # here rather than inside YOLODetector: with --device cuda on a
-        # CPU-only host resolve_device() runs a second time inside
-        # YOLODetector too, and logging from the factory keeps this to one
-        # line instead of duplicating it. On the gpu compose service
-        # SIMON_DEVICE defaults to "auto", so without this line a missing
-        # NVIDIA container toolkit silently falls back to a few-FPS CPU run
-        # with no log evidence at all.
+        # Records what the pipeline started with. Device selection defaults to
+        # "auto", so an unreachable GPU silently means CPU inference at a few
+        # frames per second, and this line is the evidence. Logged here rather
+        # than in YOLODetector, which resolves the device again.
         logger.info("Detector: weights=%s device=%s", weights, resolved_device)
         return AdaptiveDetector(str(weights), device=resolved_device)
 

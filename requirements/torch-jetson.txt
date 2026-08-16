@@ -5,10 +5,7 @@
 # cuDNN. Installing torch from PyPI here would overwrite a working build with an
 # incompatible one.
 #
-# The matching numpy<2 constraint (this base image's torch 2.2 is built
-# against NumPy 1.x's C API) is NOT here despite this being the per-target
-# seam: this file is installed via its own `pip install -r` invocation before
-# requirements/base.txt's, and base.txt's explicit numpy==2.2.6 pin would
-# just win in the later invocation. See the platform_machine-marker split in
-# requirements/base.txt instead, which is the form that actually survives
-# both invocations.
+# The numpy constraint this base image needs lives in requirements/base.txt,
+# expressed as a platform_machine environment marker. A range declared here
+# would be overridden by base.txt's exact pin, because the Dockerfile installs
+# the two files in separate pip invocations.

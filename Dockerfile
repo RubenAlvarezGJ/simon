@@ -1,28 +1,22 @@
 # syntax=docker/dockerfile:1
 
-# BASE_IMAGE must be declared before the first FROM to be usable in a FROM line.
-# Intentionally left floating (unlike the node stage below): this image never
-# regenerates a lockfile, so a patch bump here can't desync anything the way an
-# npm version shift can. Pinning it would also have to be mirrored into
-# docker-compose.yml's BASE_IMAGE build arg for both the cpu and gpu services,
-# for no matching benefit.
+# Must be declared before the first FROM to be usable in a FROM line.
+#
+# A floating tag, unlike the digest-pinned node stage below: no lockfile is
+# generated against this image and every Python dependency is already pinned in
+# requirements/, so a patch bump cannot invalidate anything.
 ARG BASE_IMAGE=python:3.13-slim
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the React SPA
 # ---------------------------------------------------------------------------
-# Pinned by digest, not just tag: npm's resolution of vite@8/rolldown's optional
-# WASM peer-dependency bindings drifts across npm versions (we hit this twice
-# going from node:20-alpine to node:24-alpine and then across two node:24-alpine
-# npm minors), which desyncs web/package-lock.json against whatever `npm ci`
-# happens to run inside. This digest is the exact node:24-alpine image
-# web/package-lock.json was generated inside, so the pin and the lock are
-# consistent by construction. Bumping this digest means regenerating the lockfile
-# inside the new image first, not just editing this line — e.g.
+# Pinned by digest: npm resolves vite/rolldown's optional WASM bindings
+# differently between versions, so a lockfile written by one npm can fail
+# `npm ci` under another. This digest is the image web/package-lock.json was
+# generated inside. To move to a newer one, regenerate the lockfile there first:
+#
 #   docker run --rm -v "$(pwd)/web:/web" -w /web node:24-alpine@<new-digest> \
 #     sh -c "npm install --package-lock-only --no-audit --no-fund"
-# so the lock is generated with the exact npm the new digest ships, then commit
-# both the new digest and the regenerated web/package-lock.json together.
 FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS web
 WORKDIR /web
 
@@ -62,21 +56,15 @@ RUN pip3 install -r ${TORCH_REQS}
 
 RUN pip3 install -r requirements/base.txt
 
-# ultralytics hard-depends on the separately-named opencv-python distribution,
-# so pip installs the GUI build alongside our headless one and the GUI build
-# wins at import time. Re-assert headless last.
+# ultralytics pulls in opencv-python, a separate distribution from the headless
+# build, and the GUI one wins at import time. Reinstalling headless last leaves
+# only what this image needs.
 #
-# NOTE: this pin duplicates requirements/base.txt's opencv-python-headless
-# pin. The two must be bumped together — if they drift, the image ends up
-# running a different headless build than the one base.txt installed and the
-# version pytest was run against on the host.
-# --no-deps is required here: --force-reinstall alone makes pip treat the
-# whole dependency graph as uninstalled and re-resolve it from the index.
-# opencv-python-headless declares numpy>=1.26.0 (open upper bound), so without
-# --no-deps this silently re-resolves numpy to whatever is newest at build
-# time, discarding base.txt's numpy==2.2.6 pin. numpy is already correct from
-# the base.txt layer above, and opencv-headless needs no other dependency
-# resolution at this point.
+# --no-deps is required: --force-reinstall alone re-resolves the whole graph,
+# and opencv-python-headless's open-ended numpy>=1.26.0 would then override the
+# exact numpy pinned in requirements/base.txt.
+#
+# This version duplicates base.txt's — change both together.
 RUN pip3 uninstall -y opencv-python \
  && pip3 install --force-reinstall --no-deps opencv-python-headless==4.13.0.92
 
@@ -86,10 +74,11 @@ COPY --from=web /web/dist web/dist
 
 EXPOSE 8000
 
-# python:*-slim ships no curl, so use urllib rather than installing one for this.
-# Assert pipeline_running, not just HTTP 200: /api/health returns 200 even when the
-# detector thread has died (e.g. a bad models/ mount), so a status-only check can
-# never fail. Docker restart policies act on exit, not health, so this cannot loop.
+# Checks the pipeline, not just the web server: /api/health answers 200 whenever
+# uvicorn is up, including after the detector thread has died, so pipeline_running
+# is the field that reports whether detection is alive. This only marks the
+# container unhealthy — Docker restart policies act on exit, not health.
+# urllib rather than curl, which the slim image does not ship.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD python3 -c "import json,urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3); sys.exit(0 if r.status==200 and json.load(r).get('pipeline_running') else 1)"
 

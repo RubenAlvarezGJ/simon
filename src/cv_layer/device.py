@@ -1,16 +1,11 @@
 """Deployment-target resolution.
 
 Keeps hardware and artifact assumptions out of the detector classes so the same
-code runs on a CUDA laptop, a CPU-only mini PC, and a Jetson Orin. This is also
-the seam where a TensorRT backend selection would land later.
+code runs on a CUDA laptop, a CPU-only mini PC, and a Jetson Orin.
 
-This module is imported under two distinct names in production: bare
-``cv_layer.device`` (e.g. `src/web_layer/pipeline_runner.py`, which relies on
-`server.py` inserting `src/` onto `sys.path`) and fully-qualified
-``src.cv_layer.device`` (e.g. `src/cv_layer/detector/yolo_detector.py`).
-Python treats these as two separate modules with two separate module-level
-namespaces. Keep this module stateless: anything stored at module level here
-would silently exist twice, out of sync.
+**Keep this module stateless.** It is imported under two names —
+``cv_layer.device`` and ``src.cv_layer.device`` — which Python treats as
+separate modules, so anything held at module level would exist twice and drift.
 """
 
 from __future__ import annotations
@@ -40,13 +35,9 @@ def resolve_device(preference: str | None = None) -> str:
     degrades to CPU rather than raising: a slow pipeline is more useful than a
     dead one, and the warning keeps the degradation visible.
 
-    Normalization (``.strip().lower()``) happens here, not at the caller, so
-    every caller is covered uniformly. Previously only the SIMON_DEVICE env
-    path normalized (inline inside `os.getenv(...)` in server.py), so
-    `--device CUDA` on the CLI reached here unnormalized: `.startswith("cuda")`
-    (which checks the lowercase form) missed it, the warn-and-degrade branch
-    below was skipped, and `"CUDA"` went straight to `model.to()` -- an opaque
-    torch error on a CPU-only box instead of this function's intended warning.
+    Input is normalized here rather than at the call sites, so ``"CUDA"``,
+    ``" cuda "`` and ``"Auto"`` behave like their lowercase forms whichever
+    caller supplies them.
     """
     if preference is not None:
         preference = preference.strip().lower()

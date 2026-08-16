@@ -26,9 +26,9 @@ test.py
 main.py
 docs/
 
-# Test suites: host-side only (see spec's "tests stay host-side" non-goal).
-# Without this, `COPY src/ src/` bakes every src/*/tests/ dir into the image --
-# dead weight that can never run there.
+# Test suites run on the host, never inside the image. Without this,
+# `COPY src/ src/` would bake every src/*/tests/ directory into the image,
+# where there is no pytest to run them.
 **/tests/
 
 # Rebuilt inside the image by the node stage

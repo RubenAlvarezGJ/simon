@@ -1,9 +1,12 @@
 """Make the project root importable during tests.
 
-Production code imports as ``from src.cv_layer...`` while ``pytest.ini`` sets
-``pythonpath = src`` for ``from cv_layer...`` imports. CLAUDE.md requires both
-styles keep working; this bridges them so a bare ``pytest`` run behaves the same
-as ``python -m pytest``.
+This repository uses two import styles. Production modules import each other
+fully qualified (``from src.cv_layer...``), while tests import via the package
+name alone (``from cv_layer...``). Both must resolve in a single test run.
+
+``pytest.ini``'s ``pythonpath = src`` covers the second style. Putting the
+project root on ``sys.path`` here covers the first, so ``pytest`` and
+``python -m pytest`` behave identically.
 """
 
 import sys
