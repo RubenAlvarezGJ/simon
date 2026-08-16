@@ -11,7 +11,22 @@
 # will fail loudly at Jetson build time; relax that single pin then rather than
 # loosening everything pre-emptively.
 fastapi==0.136.1
-numpy==2.2.6
+# Split by platform_machine (PEP 508 environment marker), not a flat pin:
+# Jetson's base image (nvcr.io/nvidia/l4t-pytorch:r36.2.0-pth2.2-py3, aarch64)
+# ships torch 2.2 preinstalled, built against NumPy 1.x's C API. Importing
+# torch under NumPy 2.x fails with "_ARRAY_API not found" / "compiled using
+# NumPy 1.x cannot be run in NumPy 2.x". requirements/torch-jetson.txt cannot
+# carry this constraint itself: the Dockerfile installs ${TORCH_REQS} and
+# base.txt as two separate `pip install` invocations (torch reqs first, then
+# base.txt), and a later invocation's explicit `==` pin always wins over an
+# earlier one -- a `numpy<2` line in torch-jetson.txt would simply be
+# upgraded back to 2.2.6 by this line, silently. Keeping both pins here, split
+# by marker, is the only form that survives that install order.
+# This constraint is coupled to the pth2.2 tag above -- when a newer L4T tag
+# ships torch >= 2.3 (built against the NumPy 2.x C API), drop the aarch64
+# line and unconditionally pin numpy==2.2.6 again.
+numpy==2.2.6; platform_machine != "aarch64"
+numpy<2; platform_machine == "aarch64"
 opencv-python-headless==4.13.0.92
 pydantic==2.13.4
 python-dotenv==1.2.2

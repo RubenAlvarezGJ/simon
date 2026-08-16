@@ -70,8 +70,15 @@ RUN pip3 install -r requirements/base.txt
 # pin. The two must be bumped together — if they drift, the image ends up
 # running a different headless build than the one base.txt installed and the
 # version pytest was run against on the host.
+# --no-deps is required here: --force-reinstall alone makes pip treat the
+# whole dependency graph as uninstalled and re-resolve it from the index.
+# opencv-python-headless declares numpy>=1.26.0 (open upper bound), so without
+# --no-deps this silently re-resolves numpy to whatever is newest at build
+# time, discarding base.txt's numpy==2.2.6 pin. numpy is already correct from
+# the base.txt layer above, and opencv-headless needs no other dependency
+# resolution at this point.
 RUN pip3 uninstall -y opencv-python \
- && pip3 install --force-reinstall opencv-python-headless==4.13.0.92
+ && pip3 install --force-reinstall --no-deps opencv-python-headless==4.13.0.92
 
 COPY src/ src/
 COPY server.py ./

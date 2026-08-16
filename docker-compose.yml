@@ -9,7 +9,12 @@
 x-simon-common: &simon-common
   build:
     context: .
-  env_file: .env
+  # Long form with required: false -- Telegram alerts are opt-in (see README),
+  # so a fresh clone with no .env must still be able to `docker compose up`.
+  # A bare `env_file: .env` hard-errors when the file is missing.
+  env_file:
+    - path: .env
+      required: false
   ports:
     - "8000:8000"
   volumes:
@@ -24,6 +29,11 @@ x-simon-common: &simon-common
     SIMON_DEVICE: "auto"
     TZ: "America/Los_Angeles"        # else footage timestamps are UTC
   restart: unless-stopped
+  # Shutdown stops runner (up to 5s) -> recorder (up to 5s) -> manager (up to
+  # 5s) in sequence, ~15s worst case, against Docker's 10s default. Without
+  # headroom here a routine `compose down` can SIGKILL ffmpeg mid-flush,
+  # leaving the in-progress cam_*.mkv segment unfinalized.
+  stop_grace_period: 30s
 
 services:
   # Laptop with an NVIDIA GPU. Requires the NVIDIA container toolkit on the host.
