@@ -37,3 +37,6 @@ src/config/
 
 main.py
 test.py
+
+# Internal planning artifacts — kept locally, never published
+docs/superpowers/
