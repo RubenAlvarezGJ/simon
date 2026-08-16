@@ -11,14 +11,6 @@ from __future__ import annotations
 
 import os
 
-# Must run before anything in the import chain below pulls in cv2: OpenCV's
-# FFmpeg backend reads this env var at init time, so setting it after import
-# has no effect. Without it the container's detection stream (VideoPipeline ->
-# cv2.VideoCapture) negotiates RTSP over UDP, while video_recorder.py's ffmpeg
-# subprocess forces `-rtsp_transport tcp` for the same feed -- two consumers
-# of one RTSP source on different transports, and UDP means packet loss
-# artifacts / decoder errors on any non-trivial LAN. Matches main.py's value
-# exactly.
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
 import argparse
