@@ -9,9 +9,20 @@ Usage::
 
 from __future__ import annotations
 
+import os
+
+# Must run before anything in the import chain below pulls in cv2: OpenCV's
+# FFmpeg backend reads this env var at init time, so setting it after import
+# has no effect. Without it the container's detection stream (VideoPipeline ->
+# cv2.VideoCapture) negotiates RTSP over UDP, while video_recorder.py's ffmpeg
+# subprocess forces `-rtsp_transport tcp` for the same feed -- two consumers
+# of one RTSP source on different transports, and UDP means packet loss
+# artifacts / decoder errors on any non-trivial LAN. Matches main.py's value
+# exactly.
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -36,6 +47,12 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--device",
+        # Kept here too (belt-and-suspenders with the argparse `choices=`-less
+        # env path for readability/log clarity), but this is no longer the
+        # only place normalization happens: resolve_device() itself
+        # (src/cv_layer/device.py) also normalizes case/whitespace now, so
+        # the CLI flag path (`--device CUDA`) -- which argparse does NOT run
+        # through this `default=` expression -- is covered too.
         default=os.getenv("SIMON_DEVICE", "auto").strip().lower(),
         help=(
             "Inference device: 'auto', 'cpu', or 'cuda'. Env: SIMON_DEVICE. "
@@ -207,7 +224,14 @@ def main() -> int:
         app,
         host=args.host,
         port=args.port,
-        log_level=args.log_level.lower(),
+        # Pass the *resolved* level (already degraded to INFO above when
+        # unrecognized), not args.log_level raw. uvicorn's Config.__init__
+        # does LOG_LEVELS[self.log_level.lower()] with no fallback of its own
+        # -- an unrecognized name (e.g. SIMON_LOG_LEVEL=verbose, which
+        # bypasses argparse `choices=` via `default=`) would raise an
+        # uncaught KeyError here and, under compose's `restart:
+        # unless-stopped`, crash-loop forever.
+        log_level=logging.getLevelName(log_level).lower(),
         timeout_graceful_shutdown=5,
     )
     server = uvicorn.Server(config)
