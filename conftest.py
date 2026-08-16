@@ -1,12 +1,9 @@
 """Make the project root importable during tests.
 
-This repository uses two import styles. Production modules import each other
-fully qualified (``from src.cv_layer...``), while tests import via the package
-name alone (``from cv_layer...``). Both must resolve in a single test run.
-
-``pytest.ini``'s ``pythonpath = src`` covers the second style. Putting the
-project root on ``sys.path`` here covers the first, so ``pytest`` and
-``python -m pytest`` behave identically.
+``pytest.ini``'s ``pythonpath = src`` covers modules under ``src/``, but
+``server.py`` lives at the project root, so tests that import it need the root
+on ``sys.path`` as well. Doing it here rather than in ``pytest.ini`` keeps it
+working from a clean checkout, since ``pytest.ini`` is not tracked.
 """
 
 import sys

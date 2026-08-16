@@ -172,8 +172,8 @@ def main() -> int:
             args.log_level,
         )
 
-    # Make `from src.web_layer.app import create_app` work alongside the
-    # `pythonpath = src` test setup.
+    # Modules under src/ import each other by package name, so src/ has to be
+    # on the path before the imports below.
     sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
     from web_layer.app import create_app

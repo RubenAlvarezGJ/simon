@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 import supervision as sv
 
-from src.cv_layer.device import resolve_device
+from cv_layer.device import resolve_device
 
 class YOLODetector:
     def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.6, device: str | None = None):
