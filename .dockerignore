@@ -1,0 +1,31 @@
+# Secrets - load-bearing. Without this the Telegram token is baked into a layer.
+.env
+
+# Virtualenv, VCS, caches
+env/
+venv/
+.git/
+.gitignore
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+
+# Mounted at runtime, not copied
+models/
+footage/
+logs/
+src/config/
+
+# Local-only and dev material
+videos/
+runs/
+context/
+scripts/
+notes.txt
+test.py
+main.py
+docs/
+
+# Rebuilt inside the image by the node stage
+web/node_modules/
+web/dist/
