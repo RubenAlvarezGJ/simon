@@ -3,9 +3,6 @@
 Keeps hardware and artifact assumptions out of the detector classes so the same
 code runs on a CUDA laptop, a CPU-only mini PC, and a Jetson Orin.
 
-**Keep this module stateless.** It is imported under two names —
-``cv_layer.device`` and ``src.cv_layer.device`` — which Python treats as
-separate modules, so anything held at module level would exist twice and drift.
 """
 
 from __future__ import annotations

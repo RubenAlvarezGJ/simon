@@ -33,13 +33,7 @@ def _default_detector_factory(
     model_path: str | Path,
     device: str | None,
 ) -> DetectorFactory:
-    """Return a factory that builds the production AdaptiveDetector.
-
-    Follows the same shape as _default_pipeline_factory: configuration is
-    captured here, and the returned callable takes no arguments so the runner
-    can invoke it directly. Model loading stays inside that callable, which is
-    what keeps it on the worker thread rather than the caller's.
-    """
+    """Return a factory that builds the production AdaptiveDetector."""
 
     def _build() -> Any:
         from cv_layer.detector.adaptive_detector import AdaptiveDetector
