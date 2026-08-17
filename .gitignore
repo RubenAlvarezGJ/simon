@@ -6,37 +6,30 @@ runs
 logs
 footage
 
-/__pycache__
+__pycache__/
 /videos
 /context
 /scripts
 notes.txt
-pytest.ini
 
 src/cv_layer/__pycache__
 src/cv_layer/detector/__pycache__
 src/cv_layer/pipeline/__pycache__
-src/cv_layer/tests
 
 src/logic_layer/__pycache__
-src/logic_layer/tests
 
 src/alert_layer/__pycache__
-src/alert_layer/tests
 
 src/web_layer/__pycache__
 src/web_layer/routes/__pycache__
-src/web_layer/tests/
 
 src/recorder/__pycache__
-src/recorder/tests
 
 web/node_modules/
 web/dist/
 src/config/
 
 main.py
-test.py
 
 # Internal planning artifacts — kept locally, never published
 docs/superpowers/

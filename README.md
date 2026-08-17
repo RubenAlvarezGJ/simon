@@ -147,6 +147,49 @@ npm run dev
 
 Run `server.py` alongside the dev server - Vite proxies `/api` → http://localhost:8000.
 
+## Running the tests
+
+The Python suite runs on `pytest`, which comes with `requirements/dev.txt` (installed in step 5
+above) — no extra setup, no camera, no GPU, and no model weights required. With the virtual
+environment activated, run it from the **project root** so `pytest.ini` is picked up:
+
+```bash
+python -m pytest
+```
+
+Expect **263 passed, 1 skipped**. The skip is normal: one test class smoke-tests an optional
+`rules.json` placed next to `src/logic_layer/tests/`, and skips itself when that file isn't
+there.
+
+If `python -m pytest` picks up the wrong interpreter (a common Windows issue when several
+Pythons are installed), call the virtual environment's Python directly:
+
+```powershell
+venv\Scripts\python.exe -m pytest    # Windows PowerShell
+```
+
+```bash
+venv/bin/python -m pytest            # macOS/Linux
+```
+
+### Running a subset
+
+Tests live in a `tests/` directory inside each layer, so a path narrows the run to that layer:
+
+```bash
+python -m pytest src/logic_layer/tests          # logic layer only (127 tests)
+python -m pytest src/alert_layer/tests          # alert layer only (45 tests)
+python -m pytest src/cv_layer/tests             # CV layer only (15 tests)
+python -m pytest src/recorder/tests             # recorder layer only (11 tests)
+python -m pytest src/web_layer/tests            # web layer only (66 tests)
+
+python -m pytest src/web_layer/tests/test_routes.py            # a single file
+python -m pytest src/web_layer/tests/test_routes.py -k health  # tests matching a name
+python -m pytest -v                                            # one line per test
+```
+
+The frontend has no test suite yet; `cd web && npm run lint` is the equivalent check there.
+
 ## Footage recording (optional)
 
 Simon can archive the raw camera stream to disk alongside detection, in 60-second segments
