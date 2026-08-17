@@ -1,0 +1,8 @@
+# x86_64 + NVIDIA GPU. These wheels bundle the CUDA runtime as nvidia-* packages,
+# so the image needs no nvidia/cuda base - only the host driver and the NVIDIA
+# container toolkit.
+--index-url https://download.pytorch.org/whl/cu124
+torch
+torchvision
+# After the first successful build, pin what pip resolved:
+#   docker compose run --rm --entrypoint pip <service> freeze | grep -Ei "^torch"

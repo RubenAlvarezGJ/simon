@@ -9,6 +9,11 @@ Usage::
 
 from __future__ import annotations
 
+import os
+
+# Must precede any cv2 import; OpenCV reads this when its FFmpeg backend loads.
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
 import argparse
 import logging
 import sys
@@ -19,60 +24,100 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Simon's web interface")
     p.add_argument(
         "--source",
-        default="0",
+        default=os.getenv("SIMON_SOURCE", "0"),
         help=(
-            "Video source: an integer camera index (e.g. '0') or a file path. "
-            "Default: 0 (first available camera)."
+            "Video source: an integer camera index (e.g. '0'), a file path, or an "
+            "RTSP URL. Env: SIMON_SOURCE. Default: 0"
         ),
     )
-    p.add_argument("--host", default="127.0.0.1", help="Bind host. Default: 127.0.0.1")
-    p.add_argument("--port", type=int, default=8000, help="Bind port. Default: 8000")
+    p.add_argument(
+        "--model",
+        default=os.getenv("SIMON_MODEL", "models/yolo11s.pt"),
+        help=(
+            "Path to the detector weights. Env: SIMON_MODEL. "
+            "Default: models/yolo11s.pt"
+        ),
+    )
+    p.add_argument(
+        "--device",
+        # Canonicalized for --help and logs; resolve_device() normalizes the
+        # CLI flag, which never passes through this expression.
+        default=os.getenv("SIMON_DEVICE", "auto").strip().lower(),
+        help=(
+            "Inference device: 'auto', 'cpu', or 'cuda'. Env: SIMON_DEVICE. "
+            "Default: auto"
+        ),
+    )
+    p.add_argument(
+        "--host",
+        default=os.getenv("SIMON_HOST", "127.0.0.1"),
+        help="Bind host. Env: SIMON_HOST. Default: 127.0.0.1",
+    )
+    p.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("SIMON_PORT", "8000")),
+        help="Bind port. Env: SIMON_PORT. Default: 8000",
+    )
     p.add_argument(
         "--zones",
-        default="src/config/zones.json",
-        help="Path to zones config JSON. Default: src/config/zones.json",
+        default=os.getenv("SIMON_ZONES", "src/config/zones.json"),
+        help=(
+            "Path to zones config JSON. Env: SIMON_ZONES. "
+            "Default: src/config/zones.json"
+        ),
     )
     p.add_argument(
         "--rules",
-        default="src/config/rules.json",
-        help="Path to rules config JSON. Default: src/config/rules.json",
+        default=os.getenv("SIMON_RULES", "src/config/rules.json"),
+        help=(
+            "Path to rules config JSON. Env: SIMON_RULES. "
+            "Default: src/config/rules.json"
+        ),
     )
     p.add_argument(
         "--alerts-log",
-        default="logs/alerts.jsonl",
-        help="JSONL alert log path. Default: logs/alerts.jsonl",
+        default=os.getenv("SIMON_ALERTS_LOG", "logs/alerts.jsonl"),
+        help="JSONL alert log path. Env: SIMON_ALERTS_LOG. Default: logs/alerts.jsonl",
     )
     p.add_argument(
         "--static-dir",
-        default="web/dist",
-        help="Directory to serve as the SPA. Default: web/dist",
+        default=os.getenv("SIMON_STATIC_DIR", "web/dist"),
+        help="Directory to serve as the SPA. Env: SIMON_STATIC_DIR. Default: web/dist",
     )
     p.add_argument(
         "--footage",
-        default="footage",
-        help="Directory holding recorded footage. Default: footage",
+        default=os.getenv("SIMON_FOOTAGE", "footage"),
+        help="Directory holding recorded footage. Env: SIMON_FOOTAGE. Default: footage",
     )
     p.add_argument(
         "--max-footage-gb",
         type=float,
-        default=10.0,
-        help="Footage-directory size budget in GB (0 = unlimited). Default: 10",
+        default=float(os.getenv("SIMON_MAX_FOOTAGE_GB", "10")),
+        help=(
+            "Footage-directory size budget in GB (0 = unlimited). "
+            "Env: SIMON_MAX_FOOTAGE_GB. Default: 10"
+        ),
     )
     p.add_argument(
         "--footage-ttl-hours",
         type=float,
-        default=24.0,
-        help="Delete footage older than this many hours (0 = no TTL). Default: 24",
+        default=float(os.getenv("SIMON_FOOTAGE_TTL_HOURS", "24")),
+        help=(
+            "Delete footage older than this many hours (0 = no TTL). "
+            "Env: SIMON_FOOTAGE_TTL_HOURS. Default: 24"
+        ),
     )
     p.add_argument(
         "--footage-sweep-mins",
         type=float,
-        default=1.0,
+        default=float(os.getenv("SIMON_FOOTAGE_SWEEP_MINS", "1")),
         help=(
             "Minutes between footage-cleanup sweeps. The size budget is only "
             "enforced at sweep time, so footage can transiently exceed it by "
             "about one segment per sweep interval; keep this at or below the "
-            "recorder's 60s segment duration. Default: 1"
+            "recorder's 60s segment duration. Env: SIMON_FOOTAGE_SWEEP_MINS. "
+            "Default: 1"
         ),
     )
     p.add_argument(
@@ -82,11 +127,28 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--log-level",
-        default="INFO",
+        # Upper-cased so a lowercase env value still matches `choices`, which
+        # argparse applies only to command-line arguments.
+        default=os.getenv("SIMON_LOG_LEVEL", "INFO").upper(),
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level. Default: INFO",
+        help="Logging level. Env: SIMON_LOG_LEVEL. Default: INFO",
     )
     return p.parse_args()
+
+
+def _resolve_log_level(name: str) -> tuple[int, bool]:
+    """Map a level name to a logging level int, defaulting to INFO.
+
+    A value from SIMON_LOG_LEVEL bypasses argparse's ``choices``, so an
+    unrecognized name reaches this function. Degrading to INFO keeps the
+    pipeline running instead of raising out of ``logging.basicConfig``.
+
+    Returns (level, used_fallback).
+    """
+    level = getattr(logging, name, None)
+    if isinstance(level, int):
+        return level, False
+    return logging.INFO, True
 
 
 def _resolve_source(raw: str) -> str | int:
@@ -98,13 +160,20 @@ def _resolve_source(raw: str) -> str | int:
 
 def main() -> int:
     args = _parse_args()
+    log_level, log_level_is_fallback = _resolve_log_level(args.log_level)
     logging.basicConfig(
-        level=getattr(logging, args.log_level),
+        level=log_level,
         format="%(asctime)s %(levelname)s %(name)s | %(message)s",
     )
+    if log_level_is_fallback:
+        logging.getLogger(__name__).warning(
+            "Unrecognized log level %r (from --log-level / SIMON_LOG_LEVEL); "
+            "falling back to INFO.",
+            args.log_level,
+        )
 
-    # Make `from src.web_layer.app import create_app` work alongside the
-    # `pythonpath = src` test setup.
+    # Modules under src/ import each other by package name, so src/ has to be
+    # on the path before the imports below.
     sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
     from web_layer.app import create_app
@@ -124,6 +193,8 @@ def main() -> int:
         zones_path=args.zones,
         rules_path=args.rules,
         jsonl_path=args.alerts_log,
+        model_path=args.model,
+        device=args.device,
         static_dir=args.static_dir,
         autostart_manager=not args.no_footage_cleanup,
         retention_config=retention_config,
@@ -134,7 +205,9 @@ def main() -> int:
         app,
         host=args.host,
         port=args.port,
-        log_level=args.log_level.lower(),
+        # Resolved level, not the raw argument: uvicorn looks the name up with
+        # no fallback of its own and raises KeyError on anything unrecognized.
+        log_level=logging.getLevelName(log_level).lower(),
         timeout_graceful_shutdown=5,
     )
     server = uvicorn.Server(config)

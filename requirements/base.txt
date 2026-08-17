@@ -1,0 +1,30 @@
+# Direct runtime dependencies, hardware-neutral.
+#
+# torch and torchvision come from a per-target file (torch-cuda.txt,
+# torch-cpu.txt, torch-jetson.txt) so this one installs on every target.
+#
+# Versions are pinned exactly. If one has no wheel for a target, the build
+# fails loudly — relax that single pin rather than loosening everything.
+fastapi==0.136.1
+
+# numpy is split by architecture. The Jetson base image ships a preinstalled
+# torch built against NumPy 1.x's C API, which fails to import under NumPy 2.x.
+# The constraint lives here rather than in torch-jetson.txt because the
+# Dockerfile installs the two files in separate pip invocations, where an exact
+# pin overrides a range. Drop the aarch64 line once a Jetson image ships
+# torch 2.3 or newer.
+numpy==2.2.6; platform_machine != "aarch64"
+numpy<2; platform_machine == "aarch64"
+
+opencv-python-headless==4.13.0.92
+pydantic==2.13.4
+python-dotenv==1.2.2
+requests==2.32.5
+supervision==0.27.0.post2
+ultralytics==8.3.253
+uvicorn==0.47.0
+
+# No import statement anywhere in src/ — uvicorn loads this at runtime to serve
+# the /api/events WebSocket, and only declares it under its 'standard' extra.
+# Removing it as unused breaks the live event stream silently.
+websockets==16.0

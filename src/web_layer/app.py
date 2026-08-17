@@ -31,6 +31,8 @@ def create_app(
     zones_path: str | Path = "src/config/zones.json",
     rules_path: str | Path = "src/config/rules.json",
     jsonl_path: str | Path = "logs/alerts.jsonl",
+    model_path: str | Path = "models/yolo11s.pt",
+    device: str | None = None,
     static_dir: str | Path | None = "web/dist",
     autostart_recorder: bool = True,
     autostart_pipeline: bool = True,
@@ -61,6 +63,8 @@ def create_app(
                 zones_path=str(zones_path),
                 rules_path=str(rules_path),
                 jsonl_path=str(jsonl_path),
+                model_path=model_path,
+                device=device,
             )
         if runner is not None:
             app.state.runner = runner

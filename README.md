@@ -49,52 +49,51 @@ source venv/bin/activate    # macOS/Linux
 
 ### 4. Install PyTorch
 
-`requirements.txt` pins CUDA 13.0 builds of PyTorch (`torch==2.11.0+cu130`,
-`torchvision==0.26.0+cu130`). **Those wheels are not on PyPI**, so they have to come from
-PyTorch's own index first — `pip install -r requirements.txt` on its own will fail with
-`No matching distribution found for torch==2.11.0+cu130`.
+Dependencies live in a `requirements/` directory split by hardware target, so PyTorch is
+installed on its own rather than through one combined file. The two torch files point at
+PyTorch's package index with `torch`/`torchvision` left unpinned, letting pip resolve the build
+that index serves for your platform. Pick one:
 
-**NVIDIA GPU (CUDA 13.0):**
+**NVIDIA GPU (CUDA):**
 
 ```bash
-pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu130
+pip install -r requirements/torch-cuda.txt
 ```
 
-**CPU only, or macOS:** there is no `+cu130` wheel for you. Delete the `+cu130` suffix from
-the two torch lines in `requirements.txt` (a plain `torch==2.11.0` pin is still satisfied by
-an installed CUDA build, so this is safe to commit), then:
+**CPU only, or macOS:**
 
 ```bash
-pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements/torch-cpu.txt
 ```
 
 ### 5. Install the remaining dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements/dev.txt
 ```
 
 PyTorch is already installed at this point, so pip reports it as satisfied and skips it.
+`requirements/dev.txt` pulls in `requirements/base.txt` (the runtime dependencies) plus `pytest` /
+`pytest-asyncio` / `httpx` for running the test suite.
 
 ### GPU / CUDA
 
 Inference device is selected automatically at startup — `cuda` when `torch.cuda.is_available()`
 returns true, otherwise `cpu`. Nothing to configure; without a usable GPU, Simon runs on CPU at
-a lower frame rate.
+a lower frame rate. You can also force it with `--device cpu`/`--device cuda`
+(`SIMON_DEVICE` under Docker — see [Containerized deployment](#containerized-deployment-docker)
+below); an explicit `cuda` request on a machine without CUDA logs a warning and falls back to CPU
+rather than failing outright.
 
-To use the pinned CUDA 13.0 build you need:
-
-- An NVIDIA GPU of **Turing (GTX 16-series / RTX 20-series) or newer**. CUDA 13 dropped support
-  for Maxwell, Pascal and Volta, so GTX 10-series and older cards must use an older CUDA build
-  (e.g. `--index-url https://download.pytorch.org/whl/cu126`) with matching torch pins.
-- A recent NVIDIA driver (r580 or newer for CUDA 13.0). No separate CUDA Toolkit install is
-  required — the wheels bundle their own runtime.
+`requirements/torch-cuda.txt` installs from PyTorch's CUDA index
+(`--index-url https://download.pytorch.org/whl/cu124`) with no version pin to edit by hand — you
+need a recent-enough NVIDIA driver for whatever CUDA 12.4 wheel pip resolves; no separate CUDA
+Toolkit install is required, the wheels bundle their own runtime.
 
 Verify after installing:
 
 ```bash
 python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
-# 2.11.0+cu130 True
 ```
 
 ## Running locally
@@ -127,6 +126,17 @@ cd web
 npm install
 npm run build      # bundles into web/dist, which server.py serves
 ```
+
+**Careful with `npm install` here.** The container build runs `npm ci` inside a digest-pinned
+`node:24-alpine` image. That pin exists because npm resolves the optional per-platform WASM
+bindings vite/rolldown depend on differently between npm versions, so a `web/package-lock.json`
+written by one npm can fail `npm ci` under another.
+
+Running `npm install` with your host's npm can rewrite the lockfile into a form the pinned image
+rejects, which breaks the container build even though everything still works locally. If you
+change frontend dependencies, regenerate the lockfile inside the pinned image instead — the
+`Dockerfile`'s stage-1 comment has the exact command — and commit it together with any digest
+change.
 
 ### Frontend dev server (optional, hot reload)
 
@@ -199,6 +209,113 @@ Editor tab):
 | `low`      | Not sent (recorded locally only)  |
 | `high`     | Sent silently (no notification sound)    |
 | `critical` | Sent with an audible notification        |
+
+## Containerized deployment (Docker)
+
+Simon ships a parameterized `Dockerfile` and a `docker-compose.yml` with three build targets.
+Only one target runs per machine.
+
+| Target | Machine |
+| ------ | ------- |
+| `cpu`    | Mini PC / any x86_64 host with no GPU |
+| `gpu`    | x86_64 laptop or desktop with an NVIDIA GPU and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on the host |
+| `jetson` | NVIDIA Jetson Orin (aarch64, JetPack 6.x). Builds only on Jetson hardware itself — confirm the L4T base image tag against your flashed JetPack release before building |
+
+### First-time setup
+
+```bash
+mkdir -p src/config footage logs
+```
+
+`docker-compose.yml` bind-mounts these into the container (`src/config` for the Zone/Rule
+editors, `footage` for recorded video, `logs` for the alert JSONL log), along with the existing
+`models/` directory. They need to exist on the host before the first `docker compose up`, or
+Docker creates them as `root`-owned directories on first use.
+
+If you want Telegram alerts, create the `.env` file described above
+([Telegram notifications](#telegram-notifications-optional)) in the project root first —
+`docker-compose.yml` references it via `env_file: [{path: .env, required: false}]`, which
+injects it into the container **at start time only** and is genuinely optional: `.env` absent
+is fine and `docker compose up` still starts (Telegram alerts just stay inert). `.env` is also
+listed in `.dockerignore`, so even when present it is never copied into an image layer or baked
+into anything you'd `docker push`.
+
+### Build and run
+
+```bash
+docker compose build cpu && docker compose up -d cpu
+docker compose build gpu && docker compose up -d gpu
+```
+
+(`jetson` follows the same pattern, but only builds on Jetson hardware.) Then open
+`http://<host>:8000` — or whatever port you've mapped, see the port gotcha below.
+
+### `SIMON_*` environment variables
+
+`docker-compose.yml` sets these under each service's `environment:` block. This is the full set
+`server.py` understands — every flag also has a `--`-prefixed CLI equivalent (`python server.py
+--help` documents both):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `SIMON_SOURCE` | `0` | Camera index, file path, or RTSP URL |
+| `SIMON_MODEL` | `models/yolo11s.pt` | Path to detector weights |
+| `SIMON_DEVICE` | `auto` | `auto`, `cpu`, or `cuda` |
+| `SIMON_HOST` | `127.0.0.1` | Bind host |
+| `SIMON_PORT` | `8000` | Bind port |
+| `SIMON_ZONES` | `src/config/zones.json` | Zones config path |
+| `SIMON_RULES` | `src/config/rules.json` | Rules config path |
+| `SIMON_ALERTS_LOG` | `logs/alerts.jsonl` | JSONL alert log path |
+| `SIMON_STATIC_DIR` | `web/dist` | Directory served as the SPA |
+| `SIMON_FOOTAGE` | `footage` | Directory holding recorded footage |
+| `SIMON_MAX_FOOTAGE_GB` | `10` | Footage size budget in GB (`0` = unlimited) |
+| `SIMON_FOOTAGE_TTL_HOURS` | `24` | Delete footage older than this many hours (`0` = no TTL) |
+| `SIMON_FOOTAGE_SWEEP_MINS` | `1` | Minutes between footage-cleanup sweeps |
+| `SIMON_LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
+
+`--no-footage-cleanup` (disables the retention manager entirely) has **no `SIMON_*` equivalent** —
+unlike every other flag above, it's a plain on/off switch with no environment backing, so a
+container can't turn footage retention off through `environment:`; you'd have to override the
+compose service's `command:` instead.
+
+**Set `SIMON_*` variables as real environment variables — not in `.env`.** The `environment:`
+block shown above works; a `SIMON_*` value placed only in `.env` does not.
+
+`.env` is loaded by `TelegramSink`, which is constructed once the pipeline starts. By then
+`server.py` has already read every `SIMON_*` default straight from the process environment, so
+anything living only in `.env` arrives too late to be seen. `TELEGRAM_BOT_TOKEN` and `CHAT_ID`
+are unaffected — `TelegramSink` reads those itself, which is exactly what `.env` is for.
+
+### Networking gotchas
+
+- **`localhost` inside a container is the container**, not your host machine. If your RTSP camera
+  (or anything else `SIMON_SOURCE` needs to reach) runs on the host, point it at
+  `host.docker.internal` (Docker Desktop) or the host's LAN IP instead — the compose file's
+  default, `rtsp://host.docker.internal:8554/cam`, already does this.
+- **`SIMON_HOST` must be `0.0.0.0`** (already set in `docker-compose.yml`). The server's own
+  default, `127.0.0.1`, only accepts connections from inside the container itself, so the
+  published port would never actually respond from outside.
+- **No USB webcam passthrough on Docker Desktop for Windows.** A numeric `SIMON_SOURCE` (camera
+  index) will not see a USB camera through Docker Desktop's Windows/WSL2 backend. Use an RTSP
+  source instead, or run on native Linux Docker if you need a camera index.
+
+### What to expect operationally
+
+- **Footage only accumulates for `rtsp://` sources.** `VideoRecorder` is only constructed when
+  `SIMON_SOURCE` is an RTSP URL; camera-index and file sources record nothing to `footage/` by
+  design (look for the startup log line `recorder autostart skipped; source '...' is not an RTSP
+  URL` to confirm this is what happened, not a failure).
+- **A file-path source eventually flips the container `unhealthy` — this is expected.** The
+  healthcheck reads the `pipeline_running` field from `/api/health` rather than settling for an
+  HTTP 200, because that endpoint answers 200 whenever the web server is up, including when the
+  detector thread has died from something like a bad `SIMON_MODEL` path. A file source that
+  reaches the end of the stream stops the pipeline legitimately, so `pipeline_running` goes
+  `false` and the container is marked unhealthy. An RTSP source never ends, so this is specific
+  to files. Note too that the pipeline decodes a file as fast as the queue allows rather than at
+  playback speed, so a clip finishes in a fraction of its running time.
+- **Host port 8000 may already be bound by something else** on your machine (a VPN client, WSL
+  port-forwarding, another service). If `docker compose up` fails to bind the port, remap the host
+  side in `docker-compose.yml`, e.g. `"8001:8000"`.
 
 ## Planned
 - Store only footage matching a user-defined rule (e.g. when a car is detected in the driveway)

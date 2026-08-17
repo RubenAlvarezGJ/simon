@@ -1,9 +1,9 @@
 import cv2
 import supervision as sv
-from src.cv_layer.detector.yolo_detector import YOLODetector
+from cv_layer.detector.yolo_detector import YOLODetector
 
 class AdaptiveDetector:
-    def __init__(self, model_path, inference_interval=3, motion_ratio_threshold=0.0015, motion_target_width=480, device="cuda"):
+    def __init__(self, model_path, inference_interval=3, motion_ratio_threshold=0.0015, motion_target_width=480, device: str | None = None):
         self.detector = YOLODetector(model_path, device=device)
         self.tracker = sv.ByteTrack()
         self.inference_interval = inference_interval            # base cadence

@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 import cv2
@@ -28,13 +29,26 @@ DetectorFactory = Callable[[], Any]
 PipelineFactory = Callable[[Any], Any]
 
 
-def _default_detector_factory() -> Any:
-    """Construct the production AdaptiveDetector with CUDA when available."""
-    import torch
-    from cv_layer.detector.adaptive_detector import AdaptiveDetector
+def _default_detector_factory(
+    model_path: str | Path,
+    device: str | None,
+) -> DetectorFactory:
+    """Return a factory that builds the production AdaptiveDetector."""
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    return AdaptiveDetector("models/yolo11s.pt", device=device)
+    def _build() -> Any:
+        from cv_layer.detector.adaptive_detector import AdaptiveDetector
+        from cv_layer.device import resolve_device, resolve_model_path
+
+        weights = resolve_model_path(model_path)
+        resolved_device = resolve_device(device)
+        # Records what the pipeline started with. Device selection defaults to
+        # "auto", so an unreachable GPU silently means CPU inference at a few
+        # frames per second, and this line is the evidence. Logged here rather
+        # than in YOLODetector, which resolves the device again.
+        logger.info("Detector: weights=%s device=%s", weights, resolved_device)
+        return AdaptiveDetector(str(weights), device=resolved_device)
+
+    return _build
 
 
 def _default_pipeline_factory(
@@ -71,6 +85,8 @@ class PipelineRunner:
         zones_path: str = "src/config/zones.json",
         rules_path: str = "src/config/rules.json",
         jsonl_path: str = "logs/alerts.jsonl",
+        model_path: str | Path = "models/yolo11s.pt",
+        device: str | None = None,
         jpeg_quality: int = 80,
         drop_frames_if_full: bool = True,
         detector_factory: Optional[DetectorFactory] = None,
@@ -84,7 +100,9 @@ class PipelineRunner:
         self._jsonl_path = jsonl_path
         self._jpeg_quality = jpeg_quality
 
-        self._detector_factory = detector_factory or _default_detector_factory
+        self._detector_factory = detector_factory or _default_detector_factory(
+            model_path, device
+        )
         self._pipeline_factory = pipeline_factory or _default_pipeline_factory(
             source, drop_frames_if_full
         )

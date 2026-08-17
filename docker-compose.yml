@@ -1,0 +1,75 @@
+# Three deployment targets from one Dockerfile.
+#
+#   docker compose build cpu && docker compose up -d cpu
+#
+# Only ONE service is used per machine. Set SIMON_SOURCE to a reachable address:
+# inside a container "localhost" is the container itself, so an RTSP server on
+# the host is host.docker.internal (Docker Desktop) or the host's LAN IP.
+
+x-simon-common: &simon-common
+  build:
+    context: .
+  # .env carries the optional Telegram credentials. required: false lets a
+  # clone without one start normally; Compose treats a missing env_file as a
+  # fatal error otherwise.
+  env_file:
+    - path: .env
+      required: false
+  ports:
+    - "8000:8000"
+  volumes:
+    - ./src/config:/app/src/config   # written by the Zone/Rule editors
+    - ./models:/app/models           # rw: TensorRT engines get written here
+    - ./footage:/app/footage
+    - ./logs:/app/logs
+  environment: &simon-env
+    SIMON_HOST: "0.0.0.0"            # 127.0.0.1 would be unreachable outside
+    SIMON_SOURCE: "rtsp://host.docker.internal:8554/cam"
+    SIMON_MODEL: "models/yolo11s.pt"
+    SIMON_DEVICE: "auto"
+    TZ: "America/Los_Angeles"        # else footage timestamps are UTC
+  restart: unless-stopped
+  # Shutdown stops the pipeline runner, the recorder and the retention manager
+  # in sequence, each with its own timeout — up to about 15 seconds, more than
+  # Docker's 10 second default allows. Without this headroom `compose down` can
+  # SIGKILL ffmpeg before it finishes writing, truncating the current segment.
+  stop_grace_period: 30s
+
+services:
+  # Laptop with an NVIDIA GPU. Requires the NVIDIA container toolkit on the host.
+  gpu:
+    <<: *simon-common
+    build:
+      context: .
+      args:
+        BASE_IMAGE: "python:3.13-slim"
+        TORCH_REQS: "requirements/torch-cuda.txt"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Mini PC, no GPU.
+  cpu:
+    <<: *simon-common
+    build:
+      context: .
+      args:
+        BASE_IMAGE: "python:3.13-slim"
+        TORCH_REQS: "requirements/torch-cpu.txt"
+    environment:
+      <<: *simon-env
+      SIMON_DEVICE: "cpu"
+
+  # Jetson Orin. Confirm the L4T tag against the flashed JetPack 6.x release.
+  jetson:
+    <<: *simon-common
+    build:
+      context: .
+      args:
+        BASE_IMAGE: "nvcr.io/nvidia/l4t-pytorch:r36.2.0-pth2.2-py3"
+        TORCH_REQS: "requirements/torch-jetson.txt"
+    runtime: nvidia

@@ -1,0 +1,11 @@
+# Jetson Orin (JetPack 6.x / L4T r36.x).
+#
+# Intentionally empty. torch and torchvision ship preinstalled in the
+# nvcr.io/nvidia/l4t-pytorch base image, built against that JetPack's CUDA and
+# cuDNN. Installing torch from PyPI here would overwrite a working build with an
+# incompatible one.
+#
+# The numpy constraint this base image needs lives in requirements/base.txt,
+# expressed as a platform_machine environment marker. A range declared here
+# would be overridden by base.txt's exact pin, because the Dockerfile installs
+# the two files in separate pip invocations.
