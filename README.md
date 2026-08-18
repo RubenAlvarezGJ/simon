@@ -432,3 +432,4 @@ needed.
 ## Planned
 - Store only footage matching a user-defined rule (e.g. when a car is detected in the driveway)
 - Video playback interface
+- Support for multiple camera sources
