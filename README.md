@@ -1,6 +1,6 @@
 # Simon
 
-A video surveillance application that uses OpenCV and YOLO11 for local, real-time object tracking and detection.
+A video surveillance application that uses OpenCV and YOLO for local, real-time object tracking and detection.
 
 Docker is the recommended way to run Simon — [Installation (Docker)](#installation-docker).
 If you prefer a bare-metal setup — [Running from source](#running-from-source).
