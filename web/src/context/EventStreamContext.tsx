@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useEventStream, type EventStreamState } from '../hooks/useEventStream';
 
-const EventStreamContext = createContext<EventStreamState | null>(null);
+export const EventStreamContext = createContext<EventStreamState | null>(null);
 
 export function EventStreamProvider({ children }: { children: ReactNode }) {
   const stream = useEventStream();
