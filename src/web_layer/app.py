@@ -1,4 +1,4 @@
-"""FastAPI application factory + lifespan for the threat-detector command center."""
+"""FastAPI application factory + lifespan for Simon's frontend interface."""
 
 from __future__ import annotations
 
@@ -137,7 +137,7 @@ def create_app(
 
             runtime.event_loop = None
 
-    app = FastAPI(title="Threat Detector Command Center", lifespan=lifespan)
+    app = FastAPI(title="Simon API", lifespan=lifespan)
 
     # Shared mutable state lives on app.state so route handlers can pick it up.
     app.state.runtime = runtime

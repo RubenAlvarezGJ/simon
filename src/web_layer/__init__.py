@@ -1,1 +1,1 @@
-"""FastAPI command-center backend for the threat detector pipeline."""
+"""FastAPI backend for Simon."""

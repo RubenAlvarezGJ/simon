@@ -1,4 +1,4 @@
-"""Entry point for the threat-detector web command center.
+"""Entry point for Simon.
 
 Usage::
 

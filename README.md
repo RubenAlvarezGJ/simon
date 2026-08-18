@@ -8,7 +8,7 @@ If you prefer a bare-metal setup — [Running from source](#running-from-source)
 ## Screenshots
 
 ### Home
-![Command Center](docs/images/home_view.png)
+![Camera](docs/images/home_view.png)
 
 ### Zone Editor
 ![Zone Editor](docs/images/zone_view.png)

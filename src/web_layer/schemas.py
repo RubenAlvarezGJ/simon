@@ -1,4 +1,4 @@
-"""Pydantic v2 request/response schemas for the command-center API.
+"""Pydantic v2 request/response schemas for the frontend API.
 """
 
 from __future__ import annotations
