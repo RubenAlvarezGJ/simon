@@ -75,7 +75,8 @@ export function LiveFeed({ fps, now }: Props) {
               <g key={name}>
                 <polygon
                   points={points}
-                  fill="rgba(47,214,255,.05)"
+                  fill="var(--ac)"
+                  fillOpacity={0.05}
                   stroke="var(--ac)"
                   strokeWidth={1.1}
                   strokeDasharray="6 6"

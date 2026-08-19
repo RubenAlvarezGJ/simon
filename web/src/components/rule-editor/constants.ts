@@ -114,9 +114,9 @@ export interface SeverityMeta {
 }
 
 export const SEV: Record<Severity, SeverityMeta> = {
-  low: { label: 'LOW', color: '#58c7ef', bg: 'rgba(88,199,239,.12)' },
-  high: { label: 'HIGH', color: '#ffb020', bg: 'rgba(255,176,32,.12)' },
-  critical: { label: 'CRITICAL', color: '#ff4d4d', bg: 'rgba(255,77,77,.12)' },
+  low: { label: 'LOW', color: 'var(--ac)', bg: 'color-mix(in srgb, var(--ac) 12%, transparent)' },
+  high: { label: 'HIGH', color: 'var(--warn)', bg: 'color-mix(in srgb, var(--warn) 12%, transparent)' },
+  critical: { label: 'CRITICAL', color: 'var(--bad)', bg: 'color-mix(in srgb, var(--bad) 12%, transparent)' },
 };
 
 export function sevMeta(sev: Severity | undefined): SeverityMeta {
@@ -132,11 +132,11 @@ export function cooldownLabel(v: number): string {
 }
 
 // Deterministic accent dot for a zone name (real zones carry no color of their own).
-const ZONE_DOT_PALETTE = ['#2fd6ff', '#ffb020', '#b48cff', '#38e08a', '#ff7ab0', '#7fd9f0'];
+const ZONE_DOT_PALETTE = ['var(--ac)', 'var(--warn)', '#b48cff', 'var(--ok)', '#ff7ab0', 'var(--muted-3)'];
 
 export function zoneDotColor(zone: string | null | undefined): string {
-  if (!zone) return '#5d6b78';
-  if (zone === 'global') return '#38e08a';
+  if (!zone) return 'var(--muted)';
+  if (zone === 'global') return 'var(--ok)';
   let hash = 0;
   for (let i = 0; i < zone.length; i += 1) hash = (hash * 31 + zone.charCodeAt(i)) | 0;
   return ZONE_DOT_PALETTE[Math.abs(hash) % ZONE_DOT_PALETTE.length];

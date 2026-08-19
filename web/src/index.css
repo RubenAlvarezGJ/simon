@@ -2,35 +2,35 @@
   color-scheme: dark;
 
   /* Core palette */
-  --bg: #07090b;
-  --panel-bg: #0a0e12;
-  --panel-bg-alt: #0b0f14;
-  --panel-border: #1a212a;
-  --panel-border-soft: #161d25;
-  --panel-border-strong: #1d262f;
-  --hairline: #131a21;
-  --row-line: #11171d;
+  --bg: #0d1013;
+  --panel-bg: #171b21;
+  --panel-bg-alt: #1c2127;
+  --panel-border: #2f343c;
+  --panel-border-soft: #252a31;
+  --panel-border-strong: #383e47;
+  --hairline: #20252b;
+  --row-line: #1b2027;
 
   /* Text shades */
-  --text: #c9d3dd;
-  --text-strong: #eef3f7;
-  --text-bright: #dbe4ec;
-  --heading: #a9b6c1;
-  --muted: #5d6b78;
-  --muted-2: #7c8b98;
-  --muted-3: #8593a0;
+  --text: #c5cbd3;
+  --text-strong: #f6f7f9;
+  --text-bright: #edeff2;
+  --heading: #abb3bf;
+  --muted: #5f6b7c;
+  --muted-2: #8f99a8;
+  --muted-3: #a1aab8;
 
   /* Accent + status. --ac is the live, recolorable accent the HUD reads. */
-  --accent: #2fd6ff;
-  --ac: #2fd6ff;
-  --ok: #38e08a;
-  --warn: #ffb020;
-  --bad: #ff4d4d;
-  --bad-bright: #ff5c5c;
+  --accent: #4c90f0;
+  --ac: #4c90f0;
+  --ok: #32a467;
+  --warn: #ec9a3c;
+  --bad: #e76a6e;
+  --bad-bright: #f55656;
 
-  --critical-bg: rgba(255, 77, 77, 0.05);
-  --high-bg: rgba(255, 176, 32, 0.08);
-  --low-bg: rgba(47, 214, 255, 0.06);
+  --critical-bg: rgba(231, 106, 110, 0.06);
+  --high-bg: rgba(236, 154, 60, 0.08);
+  --low-bg: rgba(76, 144, 240, 0.08);
 
   --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
   --sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -51,7 +51,7 @@ body {
   font-family: var(--mono);
 }
 
-::selection { background: rgba(47, 214, 255, 0.28); }
+::selection { background: color-mix(in srgb, var(--ac) 28%, transparent); }
 
 /* Thin custom scrollbars (from bundle) */
 *::-webkit-scrollbar { width: 7px; height: 7px; }
@@ -61,8 +61,8 @@ body {
 /* Animations from the bundle */
 @keyframes pulseDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 @keyframes ring {
-  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.45); }
-  100% { box-shadow: 0 0 0 12px rgba(255, 77, 77, 0); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bad) 45%, transparent); }
+  100% { box-shadow: 0 0 0 12px transparent; }
 }
 @keyframes barflux { 0%, 100% { transform: scaleY(0.45); } 50% { transform: scaleY(1); } }
 @keyframes ants { to { stroke-dashoffset: -42; } }

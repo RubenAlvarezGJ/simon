@@ -228,12 +228,6 @@ export function ZoneCanvas({
         )}
 
         {/* HUD */}
-        <div className="cc-ze-hud-rec">
-          <span className="dot" />
-          <span className="label">REC</span>
-          <span className="cam">CAM 01 — FRONT</span>
-        </div>
-        <div className="cc-ze-hud-frame">FRAME {meta ? meta.frame_id.toLocaleString('en-US') : '—'}</div>
         <div className="cc-ze-hud-cursor">
           X {pad4(cursor[0])}  Y {pad4(cursor[1])}
         </div>

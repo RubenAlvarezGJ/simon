@@ -37,7 +37,7 @@ export function ThreatPanel() {
             <div
               key={t.tracker_id}
               className="cc-trk-grid cc-trk-row"
-              style={{ background: t.alert_fired ? 'rgba(255,77,77,.05)' : 'transparent' }}
+              style={{ background: t.alert_fired ? 'color-mix(in srgb, var(--bad) 5%, transparent)' : 'transparent' }}
             >
               <span className="cc-trk-dot" style={{ background: t.alert_fired ? 'var(--bad)' : 'var(--ac)' }} />
               <span className="cc-trk-id">#{t.tracker_id}</span>

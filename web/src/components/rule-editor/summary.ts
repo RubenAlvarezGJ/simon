@@ -31,7 +31,7 @@ export function previewNode(rule: Rule): ReactNode {
   const parts = summaryParts(rule);
   const seg: ReactNode[] = [];
   const muted = { color: '#6f7d89' };
-  const strong = { color: '#eef3f7', fontWeight: 600 };
+  const strong = { color: 'var(--text-strong)', fontWeight: 600 };
 
   seg.push(createElement('span', { key: 'w', style: muted }, 'When '));
   parts.forEach((p, idx) => {
