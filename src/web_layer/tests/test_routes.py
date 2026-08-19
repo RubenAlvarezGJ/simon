@@ -134,8 +134,9 @@ def test_state_endpoint(app_client):
     r = client.get("/api/state")
     assert r.status_code == 200
     body = r.json()
-    for key in ("threats", "pipeline_stats", "dispatcher_stats", "recent_alerts", "frame_id"):
+    for key in ("threats", "pipeline_stats", "dispatcher_stats", "recent_alerts", "alert_tally", "frame_id"):
         assert key in body
+    assert body["alert_tally"]["counts"] == {"low": 0, "high": 0, "critical": 0}
 
 
 def test_zones_get_empty_then_put_then_get(app_client):
@@ -216,6 +217,9 @@ def test_websocket_hello_and_snapshot(app_client):
             if msg["type"] == "snapshot":
                 saw_snapshot = True
                 assert "threats" in msg["data"]
+                assert msg["data"]["alert_tally"]["counts"] == {
+                    "low": 0, "high": 0, "critical": 0,
+                }
                 break
         assert saw_snapshot
 

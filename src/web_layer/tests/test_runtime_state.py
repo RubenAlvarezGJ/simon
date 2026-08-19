@@ -154,6 +154,80 @@ class TestStateDict:
         assert d["threats"] == [{"tracker_id": 1}]
         assert d["pipeline_stats"] == {"frames": 7}
         assert d["recent_alerts"][-1] == {"rule_name": "x"}
+        assert d["alert_tally"]["counts"] == {"low": 0, "high": 0, "critical": 0}
+
+
+class TestAlertTally:
+    def test_starts_zeroed_with_a_wall_clock_stamp(self) -> None:
+        state = RuntimeState()
+        assert state.alert_tally["counts"] == {"low": 0, "high": 0, "critical": 0}
+        # time.time(), not time.monotonic() - must be comparable with triggered_at.
+        assert abs(state.alert_tally["since"] - time.time()) < 5.0
+
+    def test_counts_per_severity(self) -> None:
+        state = RuntimeState()
+        state.record_alert("critical")
+        state.record_alert("low")
+        state.record_alert("critical")
+        assert state.alert_tally["counts"] == {"low": 1, "high": 0, "critical": 2}
+
+    def test_since_survives_counting(self) -> None:
+        state = RuntimeState()
+        started = state.alert_tally["since"]
+        state.record_alert("high")
+        assert state.alert_tally["since"] == started
+
+    def test_unknown_severity_falls_back_to_high(self) -> None:
+        # Severity.from_value's default, so a typo in rules.json cannot invent
+        # a fourth bucket or drop the alert from the count entirely.
+        state = RuntimeState()
+        state.record_alert(None)
+        state.record_alert("wat")
+        assert state.alert_tally["counts"] == {"low": 0, "high": 2, "critical": 0}
+
+    def test_swaps_the_reference_instead_of_mutating(self) -> None:
+        # The locking discipline in runtime_state's module docstring depends on
+        # this: readers hold a ref and read at leisure, which is only safe while
+        # nothing is mutated in place.
+        state = RuntimeState()
+        before = state.alert_tally
+        before_counts = before["counts"]
+        state.record_alert("high")
+        assert state.alert_tally is not before
+        assert before_counts == {"low": 0, "high": 0, "critical": 0}
+
+    def test_snapshot_is_detached(self) -> None:
+        state = RuntimeState()
+        state.record_alert("low")
+        snap = state.alert_tally_snapshot()
+        snap["counts"]["low"] = 999
+        assert state.alert_tally["counts"]["low"] == 1
+
+    def test_concurrent_reader_never_sees_a_partial_tally(self) -> None:
+        state = RuntimeState()
+        stop = threading.Event()
+        totals: list[int] = []
+
+        def writer() -> None:
+            while not stop.is_set():
+                state.record_alert("high")
+
+        def reader() -> None:
+            for _ in range(2000):
+                tally = state.alert_tally  # single attr load - atomic
+                totals.append(sum(tally["counts"].values()))
+
+        tw = threading.Thread(target=writer)
+        tr = threading.Thread(target=reader)
+        tw.start()
+        tr.start()
+        tr.join(timeout=5.0)
+        stop.set()
+        tw.join(timeout=5.0)
+
+        # Every observation is a complete tally, so the count a reader sees only
+        # ever moves forward - it never dips through a half-written state.
+        assert totals == sorted(totals)
 
 
 def test_uptime_increases() -> None:

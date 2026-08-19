@@ -191,6 +191,10 @@
 .cc-panel-meta { display: flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 0.12em; color: var(--muted); }
 .cc-panel-meta .cc-dot { width: 6px; height: 6px; animation: pulseDot 1.1s infinite; }
 
+/* Compact button sized for the 10px panel-head meta row, not the 13px base. */
+.cc-panel-btn { padding: 2px 7px; border-radius: 3px; font-size: 9px; font-weight: 600; letter-spacing: 0.12em; color: var(--muted); }
+.cc-panel-btn:hover:not([disabled]) { color: var(--text-bright); }
+
 /* Tracked objects table */
 .cc-trk-grid { display: grid; grid-template-columns: 14px 56px 1fr 52px 54px; gap: 0 4px; align-items: center; }
 .cc-trk-head { font-size: 9px; letter-spacing: 0.1em; color: var(--muted); padding: 0 2px 7px; border-bottom: 1px solid var(--panel-border-soft); }

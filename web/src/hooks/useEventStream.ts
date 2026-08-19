@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AlertPayload,
+  AlertTally,
   DispatcherStats,
   PipelineStats,
   Severity,
@@ -9,6 +10,7 @@ import type {
   ZonesMap,
 } from '../lib/types';
 
+/** The data carried on the stream. */
 export interface EventStreamState {
   connected: boolean;
   hello: {
@@ -20,9 +22,23 @@ export interface EventStreamState {
   threats: ThreatSnapshot[];
   pipeline_stats: PipelineStats;
   dispatcher_stats: DispatcherStats;
+  /** This console's view of the feed. Emptied by `clearAlerts`, capped at MAX_ALERTS. */
   recent_alerts: AlertPayload[];
+  /** Server-owned, shared by every console, unaffected by `clearAlerts`. */
+  alert_tally: AlertTally;
   last_frame_id: number;
 }
+
+/** What consumers get: the stream's data, plus the actions over it. */
+export interface EventStream extends EventStreamState {
+  /**
+   * Empties this browser's alert feed. Purely local and purely visual - the
+   * tally keeps counting and the server keeps its own record.
+   */
+  clearAlerts: () => void;
+}
+
+const EMPTY_TALLY: AlertTally = { since: 0, counts: { low: 0, high: 0, critical: 0 } };
 
 const MAX_ALERTS = 100;
 const INITIAL_BACKOFF_MS = 500;
@@ -33,7 +49,7 @@ function wsUrl(): string {
   return `${proto}://${window.location.host}/api/events`;
 }
 
-export function useEventStream(): EventStreamState {
+export function useEventStream(): EventStream {
   const [state, setState] = useState<EventStreamState>({
     connected: false,
     hello: null,
@@ -41,6 +57,7 @@ export function useEventStream(): EventStreamState {
     pipeline_stats: {},
     dispatcher_stats: {},
     recent_alerts: [],
+    alert_tally: EMPTY_TALLY,
     last_frame_id: 0,
   });
 
@@ -76,6 +93,9 @@ export function useEventStream(): EventStreamState {
                 threats: msg.data.threats,
                 pipeline_stats: msg.data.pipeline_stats,
                 dispatcher_stats: msg.data.dispatcher_stats,
+                // Tolerate a server predating the tally rather than rendering
+                // undefined counts into the telemetry strip.
+                alert_tally: msg.data.alert_tally ?? s.alert_tally,
                 last_frame_id: msg.data.frame_id,
               };
             case 'alert':
@@ -112,5 +132,10 @@ export function useEventStream(): EventStreamState {
     };
   }, []);
 
-  return state;
+  const clearAlerts = useCallback(() => {
+    // Identity-stable when already empty, so a no-op click costs no render.
+    setState((s) => (s.recent_alerts.length === 0 ? s : { ...s, recent_alerts: [] }));
+  }, []);
+
+  return { ...state, clearAlerts };
 }

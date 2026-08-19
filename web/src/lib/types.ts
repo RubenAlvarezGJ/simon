@@ -45,6 +45,11 @@ export interface AlertPayload {
   rule_description: string;
 }
 
+export interface AlertTally {
+  since: number;
+  counts: Record<Severity, number>;
+}
+
 export interface PipelineStats {
   reader_frames_read?: number;
   reader_frames_dropped?: number;
@@ -78,4 +83,4 @@ export interface HealthInfo {
 export type WsEvent =
   | { type: 'hello'; data: { severities: Severity[]; zones: ZonesMap; frame_shape: [number, number] | null; frame_id: number } }
   | { type: 'alert'; data: AlertPayload }
-  | { type: 'snapshot'; data: { threats: ThreatSnapshot[]; pipeline_stats: PipelineStats; dispatcher_stats: DispatcherStats; frame_id: number } };
+  | { type: 'snapshot'; data: { threats: ThreatSnapshot[]; pipeline_stats: PipelineStats; dispatcher_stats: DispatcherStats; alert_tally: AlertTally; frame_id: number } };

@@ -8,10 +8,11 @@ interface Props {
 }
 
 export function TelemetryStrip({ fps, spark }: Props) {
-  const { threats, recent_alerts, pipeline_stats: p, dispatcher_stats: d } = useEventStreamContext();
+  const { threats, alert_tally, pipeline_stats: p, dispatcher_stats: d } = useEventStreamContext();
 
   const inZone = threats.filter((t) => t.active_zones.length > 0).length;
-  const critical = recent_alerts.filter((a) => a.severity === 'critical').length;
+  const alerts = Object.values(alert_tally.counts).reduce((sum, n) => sum + n, 0);
+  const critical = alert_tally.counts.critical;
 
   return (
     <div className="cc-strip">
@@ -53,7 +54,7 @@ export function TelemetryStrip({ fps, spark }: Props) {
       {/* alerts */}
       <div className="cc-card" style={{ flex: 1 }}>
         <div className="cc-card-label">ALERTS</div>
-        <div className="cc-card-value">{recent_alerts.length}</div>
+        <div className="cc-card-value">{num(alerts)}</div>
         <div className={`cc-card-sub${critical > 0 ? ' bad' : ''}`}>{critical} critical</div>
       </div>
 

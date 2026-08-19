@@ -92,6 +92,7 @@ async def _snapshot_pump(state: RuntimeState, queue: asyncio.Queue) -> None:
                     "threats": list(state.confirmed_snapshot),
                     "pipeline_stats": dict(state.pipeline_stats),
                     "dispatcher_stats": dict(state.dispatcher_stats),
+                    "alert_tally": state.alert_tally_snapshot(),
                     "frame_id": state.frame_id,
                 },
             }

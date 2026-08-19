@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { useEventStream, type EventStreamState } from '../hooks/useEventStream';
+import { useEventStream, type EventStream } from '../hooks/useEventStream';
 
-export const EventStreamContext = createContext<EventStreamState | null>(null);
+export const EventStreamContext = createContext<EventStream | null>(null);
 
 export function EventStreamProvider({ children }: { children: ReactNode }) {
   const stream = useEventStream();
@@ -12,7 +12,7 @@ export function EventStreamProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useEventStreamContext(): EventStreamState {
+export function useEventStreamContext(): EventStream {
   const ctx = useContext(EventStreamContext);
   if (ctx === null) {
     throw new Error('useEventStreamContext must be used inside EventStreamProvider');

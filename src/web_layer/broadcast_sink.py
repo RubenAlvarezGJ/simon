@@ -31,6 +31,9 @@ class BroadcastSink:
         payload = alert.to_dict()
         # Append to recent_alerts deque - atomic on a single-element append.
         self._state.recent_alerts.append(payload)
+        # Tally before the fanout below: the count must survive a console
+        # clearing its feed, and must not depend on anyone being connected.
+        self._state.record_alert(payload.get("severity"))
 
         loop = self._state.event_loop
         if loop is None:

@@ -8,10 +8,12 @@ Locking discipline:
   ``frame_shape``, ``frame_published_at``. JPEG encoding itself must happen
   *outside* the lock.
 
-* ``confirmed_snapshot``, ``pipeline_stats``, ``dispatcher_stats`` are
-  replaced by whole-object reference assignment. The GIL guarantees that
-  a single attribute assignment is atomic, so readers can grab the ref then
-  read at leisure without locking.
+* ``confirmed_snapshot``, ``pipeline_stats``, ``dispatcher_stats``,
+  ``alert_tally`` are replaced by whole-object reference assignment. The GIL
+  guarantees that a single attribute assignment is atomic, so readers can grab
+  the ref then read at leisure without locking. Never mutate these in place -
+  ``record_alert`` builds a fresh tally and assigns it in one statement, which
+  is what keeps it lock-free while the dispatcher thread is its only writer.
 
 * ``recent_alerts`` is a ``collections.deque(maxlen=200)``. Its ``append``
   is GIL-atomic.
@@ -35,6 +37,18 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from logic_layer.rule_evaluator import Severity
+
+
+def _new_alert_tally() -> dict[str, Any]:
+    """A zeroed alert tally stamped with the wall-clock moment it started.
+
+    ``since`` uses ``time.time()`` (not ``time.monotonic()``) so it stays
+    comparable with ``TriggeredAlert.triggered_at`` and can be rendered as a
+    date once the tally gains a reset schedule.
+    """
+    return {"since": time.time(), "counts": {s.value: 0 for s in Severity}}
+
 
 @dataclass
 class RuntimeState:
@@ -52,6 +66,7 @@ class RuntimeState:
     recent_alerts: deque = field(default_factory=lambda: deque(maxlen=200))
     pipeline_stats: dict = field(default_factory=dict)
     dispatcher_stats: dict = field(default_factory=dict)
+    alert_tally: dict = field(default_factory=_new_alert_tally)
 
     # --- Hot-reload signalling --------------------------------------------
     reload_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -88,6 +103,22 @@ class RuntimeState:
             self.frame_published_at = time.monotonic()
             self.frame_cond.notify_all()
             return self.frame_id
+
+    def record_alert(self, severity: object) -> None:
+        """Count one alert against the tally. Called by BroadcastSink.
+
+        Unlike ``recent_alerts``, which a console can clear from its own view,
+        the tally is shared: it is unaffected by anything the frontend does and
+        only ever resets here.
+
+        Builds a whole new tally and swaps the reference in a single assignment
+        rather than incrementing in place, per the locking discipline above.
+        """
+        bucket = Severity.from_value(severity).value
+        tally = self.alert_tally
+        counts = dict(tally["counts"])
+        counts[bucket] = counts.get(bucket, 0) + 1
+        self.alert_tally = {"since": tally["since"], "counts": counts}
 
     def consume_reload_flags(self) -> tuple[bool, bool]:
         """Return + clear the pending reload flags. Called by pipeline thread."""
@@ -144,6 +175,11 @@ class RuntimeState:
             self.frame_cond.wait_for(lambda: self.frame_id > last_id or self.shutdown_flag, timeout=timeout)
             return self.frame_id, self.jpeg_bytes
 
+    def alert_tally_snapshot(self) -> dict[str, Any]:
+        """Detached copy of the tally, safe to hand to a caller or serialise."""
+        tally = self.alert_tally
+        return {"since": tally["since"], "counts": dict(tally["counts"])}
+
     def state_dict(self) -> dict[str, Any]:
         """Lightweight snapshot for ``GET /api/state``."""
         return {
@@ -151,6 +187,7 @@ class RuntimeState:
             "pipeline_stats": dict(self.pipeline_stats),
             "dispatcher_stats": dict(self.dispatcher_stats),
             "recent_alerts": list(self.recent_alerts),
+            "alert_tally": self.alert_tally_snapshot(),
             "frame_id": self.frame_id,
             "frame_shape": self.frame_shape,
         }

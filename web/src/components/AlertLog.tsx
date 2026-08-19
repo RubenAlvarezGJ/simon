@@ -9,17 +9,28 @@ const SEV_COLOR: Record<Severity, string> = {
 };
 
 export function AlertLog() {
-  const { recent_alerts } = useEventStreamContext();
+  const { recent_alerts, clearAlerts } = useEventStreamContext();
+  const isEmpty = recent_alerts.length === 0;
 
   return (
     <div className="cc-rail-panel alerts">
       <div className="cc-panel-head">
         <span className="cc-panel-title">ALERT FEED</span>
-        <span className="cc-panel-meta">{recent_alerts.length} ACTIVE</span>
+        <span className="cc-panel-meta">
+          {recent_alerts.length} SHOWN
+          <button
+            type="button"
+            className="cc-panel-btn"
+            onClick={clearAlerts}
+            disabled={isEmpty}
+          >
+            CLEAR
+          </button>
+        </span>
       </div>
 
-      {recent_alerts.length === 0 ? (
-        <div className="cc-empty">No alerts yet.</div>
+      {isEmpty ? (
+        <div className="cc-empty">No alerts.</div>
       ) : (
         <div className="cc-alert-list">
           {recent_alerts.map((a, i) => {
