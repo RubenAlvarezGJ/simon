@@ -16,9 +16,8 @@ function blankRule(): Rule {
 }
 
 function rulesValid(rules: Rule[]): boolean {
-  return (
-    rules.length > 0 &&
-    rules.every((r) => r.name.trim() !== '' && r.conditions.length > 0 && r.conditions.every((c) => !conditionIsEmpty(c)))
+  return rules.every(
+    (r) => r.name.trim() !== '' && r.conditions.length > 0 && r.conditions.every((c) => !conditionIsEmpty(c)),
   );
 }
 
@@ -150,7 +149,11 @@ export function RuleEditor() {
       rulesPayloadSchema.parse(payload);
       await api.putRules(payload);
       setDirty(false);
-      setStatus({ text: `Saved ${rules.length} rule(s) → PUT /api/rules · 200 OK.`, kind: 'ok' });
+      setStatus(
+        rules.length === 0
+          ? { text: 'Saved 0 rule(s) — ALERTING IS NOW DISABLED until a rule is added.', kind: 'pending' }
+          : { text: `Saved ${rules.length} rule(s) → PUT /api/rules · 200 OK.`, kind: 'ok' },
+      );
     } catch (err) {
       setStatus({ text: `Save failed: ${err}`, kind: 'err' });
     }

@@ -49,7 +49,13 @@ class RuleSchema(BaseModel):
 
 
 class RulesPayload(BaseModel):
-    rules: conlist(RuleSchema, min_length=1)  # type: ignore[valid-type]
+    """A complete ruleset.
+
+    An empty list is deliberately legal: it is how the console persists
+    Alerting Off.
+    """
+
+    rules: conlist(RuleSchema, min_length=0)  # type: ignore[valid-type]
 
 
 # ---------------------------------------------------------------------------

@@ -194,6 +194,32 @@ def test_rules_round_trip(app_client):
     assert r.json()["rules"][0]["name"] == "Critical anywhere"
 
 
+def test_rules_put_accepts_empty_ruleset(app_client):
+    """Deleting the last rule must be persistable"""
+    client, _, _, rules_path = app_client
+
+    seeded = {
+        "rules": [
+            {
+                "name": "Only rule",
+                "severity": "high",
+                "cooldown_seconds": 30,
+                "conditions": [{"class_name": "handgun"}],
+            }
+        ]
+    }
+    assert client.put("/api/rules", json=seeded).status_code == 200
+
+    r = client.put("/api/rules", json={"rules": []})
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "rules": 0}
+
+    on_disk = json.loads(rules_path.read_text(encoding="utf-8"))
+    assert on_disk["rules"] == []
+
+    assert client.get("/api/rules").json()["rules"] == []
+
+
 def test_rules_put_rejects_empty_conditions(app_client):
     client, *_ = app_client
     bad = {"rules": [{"name": "x", "conditions": []}]}

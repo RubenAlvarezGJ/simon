@@ -32,7 +32,7 @@ export const ruleSchema = z.object({
 });
 
 export const rulesPayloadSchema = z.object({
-  rules: z.array(ruleSchema).min(1),
+  rules: z.array(ruleSchema),
 });
 
 // ---- HTTP helpers ----

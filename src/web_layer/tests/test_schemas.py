@@ -74,9 +74,10 @@ class TestRulesPayload:
         )
         assert payload.rules[0].name == "r1"
 
-    def test_empty_rules_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            RulesPayload(rules=[])
+    def test_empty_rules_accepted(self) -> None:
+        # An empty ruleset is a legal state meaning "alerting off".
+        payload = RulesPayload(rules=[])
+        assert payload.rules == []
 
 
 class TestZonesPayload:
