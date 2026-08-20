@@ -9,7 +9,7 @@ interface ModeDef {
 const MODES: ModeDef[] = [
   { key: 'view', label: 'VIEW', hint: 'inspect zones' },
   { key: 'draw', label: 'DRAW', hint: 'click to add points' },
-  { key: 'edit', label: 'EDIT', hint: 'drag · right-click vertex' },
+  { key: 'edit', label: 'EDIT', hint: 'left-click drag · right-click remove' },
   { key: 'delete', label: 'DELETE', hint: 'click a zone' },
 ];
 
