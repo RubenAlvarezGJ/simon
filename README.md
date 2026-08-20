@@ -14,7 +14,9 @@ If you prefer a bare-metal setup — [Running from source](#running-from-source)
 ![Zone Editor](docs/images/zone_view.png)
 
 ### Rule Editor
-![Rule Editor](docs/images/rule_view.png)
+![Rule Editor](docs/images/rule_view1.png)
+![Rule Editor](docs/images/rule_view2.png)
+![Rule Editor](docs/images/rule_view3.png)
 
 ## Installation (Docker)
 
