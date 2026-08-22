@@ -1,4 +1,4 @@
-import { useEventStreamContext } from '../context/EventStreamContext';
+import { useEventStreamContext } from '../context/eventStream';
 import { timeAgo } from '../lib/format';
 import type { Severity } from '../lib/types';
 

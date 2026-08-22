@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { useEventStreamContext } from '../context/EventStreamContext';
+import { useEventStreamContext } from '../context/eventStream';
 
 const SPARK_BARS = 20;
 const HEALTH_POLL_MS = 5000;

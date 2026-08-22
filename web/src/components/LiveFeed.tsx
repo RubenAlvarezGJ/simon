@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useEventStreamContext } from '../context/EventStreamContext';
+import { useEventStreamContext } from '../context/eventStream';
 import { formatClock, formatDate, num } from '../lib/format';
 
 interface Props {

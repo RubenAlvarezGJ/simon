@@ -3,7 +3,7 @@ import { AppHeader, type Tab } from './components/AppHeader';
 import { CommandCenter } from './components/CommandCenter';
 import { ZoneEditor } from './components/ZoneEditor';
 import { RuleEditor } from './components/RuleEditor';
-import { EventStreamProvider } from './context/EventStreamContext';
+import { EventStreamProvider } from './context/EventStreamProvider';
 import { useDerivedTelemetry } from './hooks/useDerivedTelemetry';
 import './App.css';
 

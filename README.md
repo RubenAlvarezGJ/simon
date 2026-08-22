@@ -1,5 +1,7 @@
 # Simon
 
+[![CI](https://github.com/RubenAlvarezGJ/simon/actions/workflows/ci.yml/badge.svg)](https://github.com/RubenAlvarezGJ/simon/actions/workflows/ci.yml)
+
 A video surveillance application that uses OpenCV and YOLO for local, real-time object tracking and detection.
 
 Docker is the recommended way to run Simon — [Installation (Docker)](#installation-docker).

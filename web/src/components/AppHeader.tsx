@@ -1,4 +1,4 @@
-import { useEventStreamContext } from '../context/EventStreamContext';
+import { useEventStreamContext } from '../context/eventStream';
 import { formatClock, formatDate, formatUptime } from '../lib/format';
 
 export type Tab = 'home' | 'zones' | 'rules';

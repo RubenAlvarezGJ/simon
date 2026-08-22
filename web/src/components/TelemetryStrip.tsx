@@ -1,4 +1,4 @@
-import { useEventStreamContext } from '../context/EventStreamContext';
+import { useEventStreamContext } from '../context/eventStream';
 import type { SparkBar } from '../hooks/useDerivedTelemetry';
 import { num } from '../lib/format';
 
