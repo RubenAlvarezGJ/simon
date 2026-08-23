@@ -1,6 +1,6 @@
 # Correctness gate for main: the Python suite and the frontend checks.
 #
-# Both jobs run on every pull request and on every push to main. 
+# Both jobs run on every pull request and on every push to main.
 #
 # Building the Docker image lives in docker.yml, not here.
 
@@ -11,6 +11,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_call:
   workflow_dispatch:
 
 permissions:

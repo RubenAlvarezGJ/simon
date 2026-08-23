@@ -1,6 +1,7 @@
 # Simon
 
 [![CI](https://github.com/RubenAlvarezGJ/simon/actions/workflows/ci.yml/badge.svg)](https://github.com/RubenAlvarezGJ/simon/actions/workflows/ci.yml)
+[![Release](https://github.com/RubenAlvarezGJ/simon/actions/workflows/release.yml/badge.svg)](https://github.com/RubenAlvarezGJ/simon/actions/workflows/release.yml)
 
 A video surveillance application that uses OpenCV and YOLO for local, real-time object tracking and detection.
 
@@ -23,18 +24,21 @@ If you prefer a bare-metal setup — [Running from source](#running-from-source)
 ## Installation (Docker)
 
 **This is the recommended way to run Simon.** The only things you need on the host are Git and
-Docker — the image installs Python, PyTorch, and ffmpeg, and builds the web frontend itself. The
-one exception is the `gpu` target, which also needs a host NVIDIA driver and, on Linux, the
-NVIDIA Container Toolkit — see [GPU / CUDA](#gpu--cuda).
+Docker — the image ships Python, PyTorch, ffmpeg, and the built web frontend. The one exception
+is the `gpu` variant, which also needs a host NVIDIA driver and, on Linux, the NVIDIA Container
+Toolkit — see [GPU / CUDA](#gpu--cuda).
 
-Simon ships a parameterized `Dockerfile` and a `docker-compose.yml` with three build targets.
-Only one target runs per machine.
+Pre-built images are published to GHCR at `ghcr.io/rubenalvarezgj/simon`. They are public, so no
+registry login is required. Only one variant runs per machine.
 
-| Target | Machine |
-| ------ | ------- |
-| `cpu`    | Mini PC / any x86_64 host with no GPU |
-| `gpu`    | x86_64 laptop or desktop with an NVIDIA GPU — [GPU / CUDA](#gpu--cuda) |
-| `jetson` | NVIDIA Jetson Orin (aarch64, JetPack 6.x). Builds only on Jetson hardware itself — confirm the L4T base image tag against your flashed JetPack release before building |
+| Variant | Machine | Image |
+| ------- | ------- | ----- |
+| `cpu`    | Mini PC / any x86_64 host with no GPU | `ghcr.io/rubenalvarezgj/simon:latest-cpu` |
+| `gpu`    | x86_64 laptop or desktop with an NVIDIA GPU — [GPU / CUDA](#gpu--cuda) | `ghcr.io/rubenalvarezgj/simon:latest-gpu` |
+
+There is no bare `:latest` or `:1.2.3` tag: `cpu` and `gpu` are both `linux/amd64` and differ only
+in which PyTorch build they carry, so the variant has to be named explicitly in the tag rather than
+selected by architecture. **Always pull a `-cpu` or `-gpu` tag.**
 
 ### First-time setup
 
@@ -49,10 +53,11 @@ editors, `footage` for recorded video, `logs` for the alert JSONL log), along wi
 `models/` directory. They need to exist on the host before the first `docker compose up`, or
 Docker creates them as `root`-owned directories on first use.
 
-The clone matters for more than the source: detector weights are **not** baked into the image,
-they reach the container through the `./models` bind mount. They're committed to the repo, so a
-normal clone has them — but `docker compose up` from a directory without `models/` will fail to
-load the detector.
+**The clone is required even when you use a pre-built image.** Detector weights are **not** baked
+into the image, they reach the container through the `./models` bind mount, and they are committed
+to the repo, so a normal clone has them. `docker compose up` from a directory without `models/`
+will start a container that cannot load the detector. The clone also supplies the
+`docker-compose.yml` that the commands below drive.
 
 If you want Telegram alerts, create the `.env` file described in
 [Telegram notifications](#telegram-notifications-optional) below, in the project root, before
@@ -62,20 +67,43 @@ absent is fine and `docker compose up` still starts (Telegram alerts just stay i
 also listed in `.dockerignore`, so even when present it is never copied into an image layer or
 baked into anything you'd `docker push`.
 
-### Build and run
+### Run
 
 ```bash
-docker compose build cpu && docker compose up -d cpu
-docker compose build gpu && docker compose up -d gpu
-docker compose build jetson && docker compose up -d jetson # only builds on Jetson hardware.
+docker compose pull cpu && docker compose up -d cpu
+docker compose pull gpu && docker compose up -d gpu
 ```
 
 Then open `http://<host>:8000` — or whatever port you've mapped, see [Networking](#networking) below. Then head to
 [First run](#first-run).
 
+> **Run `docker compose pull` explicitly.** The `cpu` and `gpu` services declare both an `image:`
+> and a `build:`, so if the image is not already present locally `docker compose up` will *build*
+> it rather than pull it. Pulling first is what makes this the fast path. For the same reason, a
+> local `docker compose build cpu` tags its output as `...:latest-cpu` and will shadow the
+> published image until you pull again.
+
 `docker-compose.yml` also sets `TZ` (currently `America/Los_Angeles`), which fixes the container
 clock and therefore the timestamps on alert log entries and footage segment filenames. Change it
 to your own zone.
+
+#### Pinning a version
+
+The compose services default to `${SIMON_TAG:-latest}`, so a plain `docker compose pull` fetches
+the newest release. For a fixed version, set `SIMON_TAG`:
+
+```bash
+SIMON_TAG=0.1.0 docker compose pull cpu && SIMON_TAG=0.1.0 docker compose up -d cpu
+```
+
+### Building from source
+
+If you'd rather build the Docker image yourself:
+
+```bash
+docker compose build cpu && docker compose up -d cpu
+docker compose build gpu && docker compose up -d gpu
+```
 
 ### Environment variables
 
@@ -213,10 +241,6 @@ pip install -r requirements/torch-cuda.txt
 pip install -r requirements/torch-cpu.txt
 ```
 
-There is a third file, `requirements/torch-jetson.txt`, but it installs nothing — torch ships
-inside the Jetson base image. It exists only so the `jetson` container target can share the same
-build argument as the others; local installs always pick one of the two above.
-
 ### 5. Install the remaining dependencies
 
 ```bash
@@ -344,7 +368,6 @@ come from pip or from an image — it is kernel-level.
 | Docker Desktop on Windows (WSL2 backend) | Windows NVIDIA driver only |
 | Docker Engine on Linux — or inside a WSL2 distro | Driver **and** the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
 | From source, Windows or Linux | Driver only — the toolkit is a container-runtime component and is never needed here |
-| Jetson Orin (either path) | Nothing; JetPack flashes the driver, CUDA and the container runtime together |
 
 Driver floor for the CUDA 12.4 wheels is **551.61 on Windows** and **550.54 on Linux**. Older
 drivers (528.33 / 525.60) often still work through CUDA minor-version compatibility, but aren't

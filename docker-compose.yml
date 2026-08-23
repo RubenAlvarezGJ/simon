@@ -39,6 +39,7 @@ services:
   # Laptop with an NVIDIA GPU. Requires the NVIDIA container toolkit on the host.
   gpu:
     <<: *simon-common
+    image: ghcr.io/rubenalvarezgj/simon:${SIMON_TAG:-latest}-gpu
     build:
       context: .
       args:
@@ -55,6 +56,7 @@ services:
   # Mini PC, no GPU.
   cpu:
     <<: *simon-common
+    image: ghcr.io/rubenalvarezgj/simon:${SIMON_TAG:-latest}-cpu
     build:
       context: .
       args:
@@ -63,13 +65,3 @@ services:
     environment:
       <<: *simon-env
       SIMON_DEVICE: "cpu"
-
-  # Jetson Orin. Confirm the L4T tag against the flashed JetPack 6.x release.
-  jetson:
-    <<: *simon-common
-    build:
-      context: .
-      args:
-        BASE_IMAGE: "nvcr.io/nvidia/l4t-pytorch:r36.2.0-pth2.2-py3"
-        TORCH_REQS: "requirements/torch-jetson.txt"
-    runtime: nvidia

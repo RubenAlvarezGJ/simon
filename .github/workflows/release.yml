@@ -1,0 +1,82 @@
+# Publishes the cpu and gpu images to GHCR. Runs on a version tag and nothing
+# else: a merge to main publishes nothing, so cutting a release is a deliberate
+# `git tag` rather than a side effect of merging.
+#
+# Pattern is v*.*.* rather than v* so a stray tag like `v-experiment` cannot
+# publish an artifact.
+#
+# Both variants are linux/amd64 and differ only in which torch is installed, so
+# a multi-arch manifest cannot tell them apart. The variant lives in the tag
+# suffix instead: simon:0.1.0-cpu, simon:0.1.0-gpu, i.e there is no bare :latest.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # The same python and web jobs that gate main, re-run against the tagged tree.
+  # Cheap (the suite is ~11s).
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # A gpu failure must still let cpu ship.
+      fail-fast: false
+      matrix:
+        include:
+          - variant: cpu
+            torch_reqs: requirements/torch-cpu.txt
+          - variant: gpu
+            torch_reqs: requirements/torch-cuda.txt
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Required for build-push-action; the default docker driver will not do.
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # onlatest=true is load-bearing. Without it the suffix is skipped on the
+      # latest tag, producing a bare `latest` that both matrix legs would race
+      # to overwrite with different software.
+      #
+      # metadata-action lowercases the image name, so github.repository's
+      # capitalised owner becomes ghcr.io/rubenalvarezgj/simon. GHCR rejects
+      # uppercase.
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=auto
+            suffix=-${{ matrix.variant }},onlatest=true
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push ${{ matrix.variant }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          build-args: |
+            BASE_IMAGE=python:3.13-slim
+            TORCH_REQS=${{ matrix.torch_reqs }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
