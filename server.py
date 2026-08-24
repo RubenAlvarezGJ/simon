@@ -19,6 +19,10 @@ import logging
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Simon's web interface")
