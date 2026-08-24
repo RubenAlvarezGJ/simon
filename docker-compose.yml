@@ -18,16 +18,20 @@ x-simon-common: &simon-common
   ports:
     - "8000:8000"
   volumes:
-    - ./src/config:/app/src/config   # written by the Zone/Rule editors
-    - ./models:/app/models           # rw: TensorRT engines get written here
+    - ./src/config:/app/src/config      # written by the Zone/Rule editors
+    - ./models:/app/models              # rw: TensorRT engines get written here
     - ./footage:/app/footage
     - ./logs:/app/logs
   environment: &simon-env
-    SIMON_HOST: "0.0.0.0"            # 127.0.0.1 would be unreachable outside
-    SIMON_SOURCE: "rtsp://host.docker.internal:8554/cam"
-    SIMON_MODEL: "models/yolo11s.pt"
-    SIMON_DEVICE: "auto"
-    TZ: "America/Los_Angeles"        # else footage timestamps are UTC
+    SIMON_HOST: "0.0.0.0"               # 127.0.0.1 would be unreachable outside
+    SIMON_SOURCE: "${SIMON_SOURCE:-rtsp://host.docker.internal:8554/cam}"
+    SIMON_MODEL: "${SIMON_MODEL:-models/yolo11s.pt}"
+    SIMON_DEVICE: "${SIMON_DEVICE:-auto}"
+    SIMON_MAX_FOOTAGE_GB: "${SIMON_MAX_FOOTAGE_GB:-10}"
+    SIMON_FOOTAGE_TTL_HOURS: "${SIMON_FOOTAGE_TTL_HOURS:-24}"
+    SIMON_FOOTAGE_SWEEP_MINS: "${SIMON_FOOTAGE_SWEEP_MINS:-1}"
+    SIMON_LOG_LEVEL: "${SIMON_LOG_LEVEL:-INFO}"
+    TZ: "${TZ:-America/Los_Angeles}"    # else footage timestamps are UTC
   restart: unless-stopped
   # Shutdown stops the pipeline runner, the recorder and the retention manager
   # in sequence, each with its own timeout — up to about 15 seconds, more than

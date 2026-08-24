@@ -59,13 +59,37 @@ to the repo, so a normal clone has them. `docker compose up` from a directory wi
 will start a container that cannot load the detector. The clone also supplies the
 `docker-compose.yml` that the commands below drive.
 
-If you want Telegram alerts, create the `.env` file described in
-[Telegram notifications](#telegram-notifications-optional) below, in the project root, before
-starting — `docker-compose.yml` references it via `env_file: [{path: .env, required: false}]`,
-which injects it into the container **at start time only** and is genuinely optional: `.env`
-absent is fine and `docker compose up` still starts (Telegram alerts just stay inert). `.env` is
-also listed in `.dockerignore`, so even when present it is never copied into an image layer or
-baked into anything you'd `docker push`.
+### Environment variables
+
+Every flag has a matching `SIMON_*` environment variable (`python server.py --help` documents
+both spellings), with precedence **CLI flag > environment variable > built-in default**. Create a
+`.env` file at the project root (see `.env.example`) to set them — both Docker (`docker-compose.yml`'s
+`environment:` block reads from it) and `python server.py` (from source) load it, so the same file
+works either way. You can also edit `docker-compose.yml`'s `environment:` block directly instead
+of using `.env`, or pass values as CLI flags. `.env` is only read at startup, so restart to pick up
+a change — `docker compose up -d --force-recreate <target>` for a container, or just restart
+`python server.py` from source.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `SIMON_SOURCE` | `0` | Camera index, file path, or RTSP URL |
+| `SIMON_MODEL` | `models/yolo11s.pt` | Path to detector weights |
+| `SIMON_DEVICE` | `auto` | `auto`, `cpu`, or `cuda` — see [GPU / CUDA](#gpu--cuda) |
+| `SIMON_HOST` | `127.0.0.1` | Bind host |
+| `SIMON_PORT` | `8000` | Bind port |
+| `SIMON_ZONES` | `src/config/zones.json` | Zones config path |
+| `SIMON_RULES` | `src/config/rules.json` | Rules config path |
+| `SIMON_ALERTS_LOG` | `logs/alerts.jsonl` | JSONL alert log path |
+| `SIMON_STATIC_DIR` | `web/dist` | Directory served as the SPA |
+| `SIMON_FOOTAGE` | `footage` | See [Footage recording](#footage-recording-optional) |
+| `SIMON_MAX_FOOTAGE_GB` | `10` | See [Footage recording](#footage-recording-optional) |
+| `SIMON_FOOTAGE_TTL_HOURS` | `24` | See [Footage recording](#footage-recording-optional) |
+| `SIMON_FOOTAGE_SWEEP_MINS` | `1` | See [Footage recording](#footage-recording-optional) |
+| `SIMON_LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
+| `TZ` | `America/Los_Angeles` | Process/container clock — affects footage filenames & alert log timestamps. Not a `SIMON_*` var and has no CLI flag; set it via `.env` or `environment:` |
+
+If you want Telegram alerts, see [Telegram notifications](#telegram-notifications-optional)
+before running.
 
 ### Run
 
@@ -82,10 +106,6 @@ Then open `http://<host>:8000` — or whatever port you've mapped, see [Networki
 > it rather than pull it. Pulling first is what makes this the fast path. For the same reason, a
 > local `docker compose build cpu` tags its output as `...:latest-cpu` and will shadow the
 > published image until you pull again.
-
-`docker-compose.yml` also sets `TZ` (currently `America/Los_Angeles`), which fixes the container
-clock and therefore the timestamps on alert log entries and footage segment filenames. Change it
-to your own zone.
 
 #### Pinning a version
 
@@ -104,45 +124,6 @@ If you'd rather build the Docker image yourself:
 docker compose build cpu && docker compose up -d cpu
 docker compose build gpu && docker compose up -d gpu
 ```
-
-### Environment variables
-
-Every one of Simon's CLI flags except `--no-footage-cleanup` also reads a `SIMON_*` environment
-variable for its default, and the table below is that full set (`python server.py --help`
-documents both spellings). `docker-compose.yml` only *sets* four of them under its shared
-`environment:` block — `SIMON_HOST`, `SIMON_SOURCE`, `SIMON_MODEL`, and `SIMON_DEVICE` (which the
-`cpu` service pins to `cpu`). The rest are understood but unset, so they fall back to the defaults
-shown here; add them to `environment:` if you need to change one.
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `SIMON_SOURCE` | `0` | Camera index, file path, or RTSP URL |
-| `SIMON_MODEL` | `models/yolo11s.pt` | Path to detector weights |
-| `SIMON_DEVICE` | `auto` | `auto`, `cpu`, or `cuda` — see [GPU / CUDA](#gpu--cuda) |
-| `SIMON_HOST` | `127.0.0.1` | Bind host |
-| `SIMON_PORT` | `8000` | Bind port |
-| `SIMON_ZONES` | `src/config/zones.json` | Zones config path |
-| `SIMON_RULES` | `src/config/rules.json` | Rules config path |
-| `SIMON_ALERTS_LOG` | `logs/alerts.jsonl` | JSONL alert log path |
-| `SIMON_STATIC_DIR` | `web/dist` | Directory served as the SPA |
-| `SIMON_FOOTAGE` | `footage` | See [Footage recording](#footage-recording-optional) |
-| `SIMON_MAX_FOOTAGE_GB` | `10` | See [Footage recording](#footage-recording-optional) |
-| `SIMON_FOOTAGE_TTL_HOURS` | `24` | See [Footage recording](#footage-recording-optional) |
-| `SIMON_FOOTAGE_SWEEP_MINS` | `1` | See [Footage recording](#footage-recording-optional) |
-| `SIMON_LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
-
-`--no-footage-cleanup` (disables the retention manager entirely) has **no `SIMON_*` equivalent** —
-unlike every other flag above, it's a plain on/off switch with no environment backing, so a
-container can't turn footage retention off through `environment:`; you'd have to override the
-compose service's `command:` instead.
-
-**Set `SIMON_*` variables as real environment variables — not in `.env`.** The `environment:`
-block shown above works; a `SIMON_*` value placed only in `.env` does not.
-
-`.env` is loaded by `TelegramSink`, which is constructed once the pipeline starts. By then
-`server.py` has already read every `SIMON_*` default straight from the process environment, so
-anything living only in `.env` arrives too late to be seen. `TELEGRAM_BOT_TOKEN` and `CHAT_ID`
-are unaffected — `TelegramSink` reads those itself, which is exactly what `.env` is for.
 
 ### Networking
 
@@ -179,8 +160,6 @@ are unaffected — `TelegramSink` reads those itself, which is exactly what `.en
 - **Host port 8000 may already be bound by something else** on your machine (a VPN client, WSL
   port-forwarding, another service). If `docker compose up` fails to bind the port, remap the host
   side in `docker-compose.yml`, e.g. `"8001:8000"`.
-
-
 
 ## Running from source
 
@@ -423,7 +402,7 @@ This is your `CHAT_ID`. For a group chat, add the bot to the group and use the g
 
 #### 3. Create a `.env` file
 
-In the project root, create a `.env` file. It's git-ignored, so
+If you haven't already, create a `.env` file in the project root (see .env.example). It's git-ignored, so
 the secrets stay out of version control:
 
 ```
