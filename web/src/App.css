@@ -25,7 +25,7 @@
   flex: 0 0 60px;
   padding: 0 22px;
   border-bottom: 1px solid var(--hairline);
-  background: linear-gradient(180deg, var(--panel-bg), var(--bg));
+  background: var(--panel-bg);
 }
 
 .cc-header-left { display: flex; align-items: center; gap: 18px; min-width: 0; }
