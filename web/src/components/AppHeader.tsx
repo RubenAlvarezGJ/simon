@@ -61,11 +61,6 @@ export function AppHeader({ tab, onTab, now, uptimeS }: Props) {
           <span className="cc-clock">{formatClock(now)}</span>
           <span className="cc-meta-sub">{formatDate(now)} · UP {formatUptime(uptimeS)}</span>
         </div>
-        <div className="cc-divider" />
-        <div className="cc-meta-block">
-          <span className="cc-meta-name">R. ALVAREZ</span>
-          {/*<span className="cc-meta-sub">OPERATOR</span>*/}
-        </div>
       </div>
     </header>
   );
