@@ -173,7 +173,6 @@ export function RuleEditor() {
         status={status}
         dirty={dirty}
         valid={valid}
-        showPreview
         onName={(v) => patchRule({ name: v })}
         onDesc={(v) => patchRule({ description: v })}
         onSeverity={(s: Severity) => patchRule({ severity: s })}

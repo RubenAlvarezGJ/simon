@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import type { Rule, Severity } from '../../lib/types';
-import { COOLDOWN_PRESETS, SEVERITY_ORDER, SEV, cooldownLabel, sevMeta } from './constants';
-import { previewNode } from './summary';
+import { COOLDOWN_PRESETS, SEVERITY_ORDER, SEV, cooldownLabel } from './constants';
 import { ConditionCard, type ZoneOption } from './ConditionCard';
+import { RulePreview } from './RulePreview';
 import { STATUS_DOT, type EditorStatus } from './types';
 
 interface Props {
@@ -10,7 +11,6 @@ interface Props {
   status: EditorStatus;
   dirty: boolean;
   valid: boolean;
-  showPreview: boolean;
   onName: (v: string) => void;
   onDesc: (v: string) => void;
   onSeverity: (s: Severity) => void;
@@ -69,7 +69,7 @@ function NoSelection({ onAdd }: { onAdd: () => void }) {
 
 function RuleBody(props: Props & { rule: Rule }) {
   const { rule } = props;
-  const sev = sevMeta(rule.severity);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
     <div className="cc-re-detail-body">
@@ -149,21 +149,19 @@ function RuleBody(props: Props & { rule: Rule }) {
                 </button>
               ))}
             </div>
+            <button
+              className="cc-re-cd-info"
+              onClick={() => setPreviewOpen(true)}
+              title="Show plain-English preview"
+              aria-label="Show plain-English preview"
+            >
+              i
+            </button>
           </div>
         </div>
       </div>
 
-      {/* preview */}
-      {props.showPreview && (
-        <div className="cc-re-preview">
-          <div className="cc-re-preview-bar" style={{ background: sev.color }} />
-          <div className="cc-re-preview-head">
-            <span className="cc-re-preview-dot" style={{ background: sev.color }} />
-            <span className="cc-re-preview-label">PREVIEW</span>
-          </div>
-          <div className="cc-re-preview-text">{previewNode(rule)}</div>
-        </div>
-      )}
+      {previewOpen && <RulePreview rule={rule} onClose={() => setPreviewOpen(false)} />}
 
       {/* conditions */}
       <div className="cc-re-conds">
