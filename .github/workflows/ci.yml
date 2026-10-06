@@ -46,6 +46,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements/dev.txt
 
+      # ruff comes from dev.txt, so CI runs the same pinned version as `make
+      # format-check` locally. Not via make: its VENV_BIN points at .venv/,
+      # which the runner does not have.
+      - name: Lint
+        run: ruff check --output-format=github .
+
+      - name: Check formatting
+        run: ruff format --check .
+
       # Ultralytics pulls in opencv-python, a separate distribution from the headless
       # build pinned in base.txt, and the GUI one wins at import time. Its version is
       # unpinned and arrives transitively, and it needs libGL, which a runner
