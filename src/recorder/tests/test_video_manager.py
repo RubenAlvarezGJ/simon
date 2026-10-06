@@ -15,7 +15,6 @@ import pytest
 
 from recorder.video_manager import RetentionConfig, VideoManager
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -47,9 +46,7 @@ def test_ttl_deletes_old_keeps_new(tmp_path: Path) -> None:
     _make_segment(footage, "cam_mid.mkv", 10, age_seconds=500)
     _make_segment(footage, "cam_new.mkv", 10, age_seconds=1)
 
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, ttl_seconds=600, max_bytes=None)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, ttl_seconds=600, max_bytes=None))
     mgr._sweep()
 
     # old (>600s) deleted; mid (<600s) and newest survive.
@@ -62,9 +59,7 @@ def test_ttl_none_disables(tmp_path: Path) -> None:
     _make_segment(footage, "cam_old.mkv", 10, age_seconds=10_000)
     _make_segment(footage, "cam_new.mkv", 10, age_seconds=1)
 
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, ttl_seconds=None, max_bytes=None)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, ttl_seconds=None, max_bytes=None))
     mgr._sweep()
 
     assert _names(footage) == {"cam_old.mkv", "cam_new.mkv"}
@@ -84,9 +79,7 @@ def test_budget_deletes_oldest_until_under(tmp_path: Path) -> None:
     _make_segment(footage, "cam_3.mkv", 100, age_seconds=200)
     _make_segment(footage, "cam_4.mkv", 100, age_seconds=1)  # newest, protected
 
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, ttl_seconds=None, max_bytes=250)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, ttl_seconds=None, max_bytes=250))
     mgr._sweep()
 
     # Oldest-first: delete cam_1, cam_2 -> remaining cam_3 (100) + cam_4 (100) = 200 <= 250.
@@ -99,9 +92,7 @@ def test_budget_none_disables(tmp_path: Path) -> None:
     _make_segment(footage, "cam_1.mkv", 1000, age_seconds=400)
     _make_segment(footage, "cam_2.mkv", 1000, age_seconds=1)
 
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, ttl_seconds=None, max_bytes=None)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, ttl_seconds=None, max_bytes=None))
     mgr._sweep()
 
     assert _names(footage) == {"cam_1.mkv", "cam_2.mkv"}
@@ -119,9 +110,7 @@ def test_newest_segment_never_deleted(tmp_path: Path) -> None:
     # recording target and must survive.
     _make_segment(footage, "cam_only.mkv", 10_000, age_seconds=10_000)
 
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, ttl_seconds=1, max_bytes=1)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, ttl_seconds=1, max_bytes=1))
     mgr._sweep()
 
     assert _names(footage) == {"cam_only.mkv"}
@@ -161,9 +150,7 @@ def test_unlink_race_continues(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr(Path, "unlink", flaky_unlink)
 
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, ttl_seconds=500, max_bytes=None)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, ttl_seconds=500, max_bytes=None))
     mgr._sweep()  # must not raise despite the racing delete
 
     # cam_2 still deleted; cam_1 raised (left on disk); newest kept.
@@ -179,9 +166,7 @@ def test_unlink_race_continues(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 def test_start_stop_clean(tmp_path: Path) -> None:
     footage = tmp_path / "footage"
     footage.mkdir()
-    mgr = VideoManager(
-        RetentionConfig(footage_path=footage, sweep_interval_seconds=60)
-    )
+    mgr = VideoManager(RetentionConfig(footage_path=footage, sweep_interval_seconds=60))
     mgr.start()
     assert mgr.is_running
     mgr.stop(timeout=5.0)

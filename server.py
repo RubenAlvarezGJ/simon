@@ -37,20 +37,14 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--model",
         default=os.getenv("SIMON_MODEL", "models/yolo11s.pt"),
-        help=(
-            "Path to the detector weights. Env: SIMON_MODEL. "
-            "Default: models/yolo11s.pt"
-        ),
+        help=("Path to the detector weights. Env: SIMON_MODEL. Default: models/yolo11s.pt"),
     )
     p.add_argument(
         "--device",
         # Canonicalized for --help and logs; resolve_device() normalizes the
         # CLI flag, which never passes through this expression.
         default=os.getenv("SIMON_DEVICE", "auto").strip().lower(),
-        help=(
-            "Inference device: 'auto', 'cpu', or 'cuda'. Env: SIMON_DEVICE. "
-            "Default: auto"
-        ),
+        help=("Inference device: 'auto', 'cpu', or 'cuda'. Env: SIMON_DEVICE. Default: auto"),
     )
     p.add_argument(
         "--host",
@@ -66,18 +60,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--zones",
         default=os.getenv("SIMON_ZONES", "src/config/zones.json"),
-        help=(
-            "Path to zones config JSON. Env: SIMON_ZONES. "
-            "Default: src/config/zones.json"
-        ),
+        help=("Path to zones config JSON. Env: SIMON_ZONES. Default: src/config/zones.json"),
     )
     p.add_argument(
         "--rules",
         default=os.getenv("SIMON_RULES", "src/config/rules.json"),
-        help=(
-            "Path to rules config JSON. Env: SIMON_RULES. "
-            "Default: src/config/rules.json"
-        ),
+        help=("Path to rules config JSON. Env: SIMON_RULES. Default: src/config/rules.json"),
     )
     p.add_argument(
         "--alerts-log",
@@ -171,8 +159,7 @@ def main() -> int:
     )
     if log_level_is_fallback:
         logging.getLogger(__name__).warning(
-            "Unrecognized log level %r (from --log-level / SIMON_LOG_LEVEL); "
-            "falling back to INFO.",
+            "Unrecognized log level %r (from --log-level / SIMON_LOG_LEVEL); falling back to INFO.",
             args.log_level,
         )
 
@@ -180,13 +167,14 @@ def main() -> int:
     # on the path before the imports below.
     sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-    from web_layer.app import create_app
-    from recorder.video_manager import RetentionConfig
     import uvicorn
+
+    from recorder.video_manager import RetentionConfig
+    from web_layer.app import create_app
 
     retention_config = RetentionConfig(
         footage_path=args.footage,
-        max_bytes=int(args.max_footage_gb * 1024 ** 3) if args.max_footage_gb > 0 else None,
+        max_bytes=int(args.max_footage_gb * 1024**3) if args.max_footage_gb > 0 else None,
         ttl_seconds=args.footage_ttl_hours * 3600 if args.footage_ttl_hours > 0 else None,
         sweep_interval_seconds=args.footage_sweep_mins * 60,
     )

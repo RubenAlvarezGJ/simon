@@ -9,10 +9,10 @@ from alert_layer import sinks as sinks_module
 from alert_layer.sinks import ConsoleSink, JsonlSink, Sink, TelegramSink
 from logic_layer.rule_evaluator import Severity, TriggeredAlert
 
-
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def make_alert(
     rule_name: str = "TestRule",
@@ -26,9 +26,7 @@ def make_alert(
         triggered_at=1234567.890,
         tracker_ids=list(ids) if ids is not None else [7, 9],
         threat_snapshots=(
-            snapshots
-            if snapshots is not None
-            else [{"tracker_id": 7, "class_name": "handgun"}]
+            snapshots if snapshots is not None else [{"tracker_id": 7, "class_name": "handgun"}]
         ),
         rule_description=rule_description,
         severity=Severity(severity),
@@ -72,8 +70,8 @@ def build_telegram_sink(
 # Sink protocol
 # ===========================================================================
 
-class TestSinkProtocol:
 
+class TestSinkProtocol:
     def test_all_sinks_satisfy_protocol(self, tmp_path):
         assert isinstance(ConsoleSink(), Sink)
         assert isinstance(JsonlSink(tmp_path / "x.jsonl"), Sink)
@@ -83,8 +81,8 @@ class TestSinkProtocol:
 # ConsoleSink
 # ===========================================================================
 
-class TestConsoleSink:
 
+class TestConsoleSink:
     def test_emits_one_info_record_per_alert(self, caplog):
         sink = ConsoleSink(logger_name="alert_layer.console.test_emits")
         with caplog.at_level(logging.INFO, logger="alert_layer.console.test_emits"):
@@ -104,8 +102,8 @@ class TestConsoleSink:
 # JsonlSink
 # ===========================================================================
 
-class TestJsonlSink:
 
+class TestJsonlSink:
     def test_writes_one_json_object_per_line(self, tmp_path):
         path = tmp_path / "alerts.jsonl"
         sink = JsonlSink(path)
@@ -157,6 +155,7 @@ class TestJsonlSink:
 # ===========================================================================
 # TelegramSink
 # ===========================================================================
+
 
 class TestTelegramSinkBypass:
     """Missing credentials -> bypass mode, never touches the network."""
@@ -319,7 +318,6 @@ class TestTelegramSinkFormatting:
 
 
 class TestTelegramSinkClose:
-
     def test_close_closes_session(self, monkeypatch):
         sink = build_telegram_sink(monkeypatch)
         session = MagicMock()

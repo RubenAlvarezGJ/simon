@@ -100,9 +100,7 @@ class PipelineRunner:
         self._jsonl_path = jsonl_path
         self._jpeg_quality = jpeg_quality
 
-        self._detector_factory = detector_factory or _default_detector_factory(
-            model_path, device
-        )
+        self._detector_factory = detector_factory or _default_detector_factory(model_path, device)
         self._pipeline_factory = pipeline_factory or _default_pipeline_factory(
             source, drop_frames_if_full
         )
@@ -127,9 +125,7 @@ class PipelineRunner:
             raise RuntimeError("PipelineRunner is already running.")
         self._stop_event.clear()
         self._started_event.clear()
-        self._thread = threading.Thread(
-            target=self._run, name="PipelineRunner", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="PipelineRunner", daemon=True)
         self._thread.start()
         if wait_for_first_frame:
             self._started_event.wait(timeout=timeout)
@@ -212,9 +208,7 @@ class PipelineRunner:
                     [int(cv2.IMWRITE_JPEG_QUALITY), int(self._jpeg_quality)],
                 )
                 if not ok:
-                    logger.warning(
-                        "PipelineRunner: cv2.imencode returned False; skipping frame"
-                    )
+                    logger.warning("PipelineRunner: cv2.imencode returned False; skipping frame")
                     continue
                 jpeg_bytes = buf.tobytes()
                 h, w = annotated_frame.shape[:2]

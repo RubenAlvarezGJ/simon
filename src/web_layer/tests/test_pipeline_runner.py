@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import logging
 import time
-import types
 from pathlib import Path
 
 import numpy as np
@@ -21,7 +20,6 @@ import supervision as sv
 
 from web_layer.pipeline_runner import PipelineRunner
 from web_layer.runtime_state import RuntimeState
-
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -193,9 +191,7 @@ def test_default_detector_factory_logs_resolved_device(monkeypatch, tmp_path, ca
     weights = tmp_path / "custom.pt"
     weights.write_bytes(b"not-a-real-model")
 
-    monkeypatch.setattr(
-        adaptive_module, "AdaptiveDetector", lambda model_path, device=None: None
-    )
+    monkeypatch.setattr(adaptive_module, "AdaptiveDetector", lambda model_path, device=None: None)
 
     factory = _default_detector_factory(str(weights), "cpu")
     with caplog.at_level(logging.INFO, logger="web_layer.pipeline_runner"):

@@ -46,7 +46,5 @@ async def mjpeg_generator(
         yield (
             b"--" + BOUNDARY.encode() + b"\r\n"
             b"Content-Type: image/jpeg\r\n"
-            b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n"
-            + jpeg
-            + b"\r\n"
+            b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n" + jpeg + b"\r\n"
         )

@@ -6,8 +6,6 @@ import asyncio
 import threading
 import time
 
-import pytest
-
 from web_layer.runtime_state import RuntimeState
 
 

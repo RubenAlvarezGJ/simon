@@ -30,9 +30,8 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from state_manager import ThreatState
 
@@ -43,6 +42,7 @@ logger = logging.getLogger(__name__)
 # Severity - declared per rule, drives downstream alert routing
 # ---------------------------------------------------------------------------
 
+
 class Severity(str, Enum):
     """
     Severity of a rule, set in ``rules.json`` and carried on every
@@ -52,8 +52,9 @@ class Severity(str, Enum):
       - ``HIGH``     pushed to Telegram silently (``disable_notification``).
       - ``CRITICAL`` pushed to Telegram with notification sound.
     """
-    LOW      = "low"
-    HIGH     = "high"
+
+    LOW = "low"
+    HIGH = "high"
     CRITICAL = "critical"
 
     @classmethod
@@ -78,6 +79,7 @@ class Severity(str, Enum):
 # ---------------------------------------------------------------------------
 # Output payload - consumed by Alert Dispatcher and Agentic VLM
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TriggeredAlert:
@@ -105,20 +107,21 @@ class TriggeredAlert:
         rule_description: The optional ``description`` field from the JSON
                       rule definition.  Passed through verbatim.
     """
-    rule_name:         str
-    triggered_at:      float
-    tracker_ids:       list[int]
-    threat_snapshots:  list[dict]
-    rule_description:  str = ""
-    severity:          Severity = Severity.HIGH
+
+    rule_name: str
+    triggered_at: float
+    tracker_ids: list[int]
+    threat_snapshots: list[dict]
+    rule_description: str = ""
+    severity: Severity = Severity.HIGH
 
     def to_dict(self) -> dict:
         """Fully serialisable snapshot for structured logging or queue transport."""
         return {
-            "rule_name":        self.rule_name,
-            "severity":         self.severity.value,
-            "triggered_at":     self.triggered_at,
-            "tracker_ids":      self.tracker_ids,
+            "rule_name": self.rule_name,
+            "severity": self.severity.value,
+            "triggered_at": self.triggered_at,
+            "tracker_ids": self.tracker_ids,
             "threat_snapshots": self.threat_snapshots,
             "rule_description": self.rule_description,
         }
@@ -127,6 +130,7 @@ class TriggeredAlert:
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ConditionSpec:
@@ -144,8 +148,9 @@ class ConditionSpec:
                         or ``None`` (any zone including "global" is accepted).
         min_confidence: Minimum confidence threshold, or ``None``.
     """
-    class_name:     Optional[str]   = None
-    zone:           Optional[str]   = None
+
+    class_name: Optional[str] = None
+    zone: Optional[str] = None
     min_confidence: Optional[float] = None
 
 
@@ -164,11 +169,12 @@ class RuleDefinition:
                           this rule.
         description:      Optional operator annotation.
     """
-    name:             str
-    conditions:       list[ConditionSpec]
+
+    name: str
+    conditions: list[ConditionSpec]
     cooldown_seconds: float
-    severity:         Severity = Severity.HIGH
-    description:      str = ""
+    severity: Severity = Severity.HIGH
+    description: str = ""
 
 
 @dataclass
@@ -187,9 +193,11 @@ class FrameIndex:
                      ``active_zones`` list.
         all:         Unfiltered reference to the full confirmed threat list.
     """
-    by_class:    dict[str,  list["ThreatState"]] = field(default_factory=dict)
-    by_zone:     dict[str,  list["ThreatState"]] = field(default_factory=dict)
-    all:         list["ThreatState"]             = field(default_factory=list)
+
+    by_class: dict[str, list["ThreatState"]] = field(default_factory=dict)
+    by_zone: dict[str, list["ThreatState"]] = field(default_factory=dict)
+    all: list["ThreatState"] = field(default_factory=list)
+
 
 class RuleEvaluator:
     """
@@ -238,10 +246,10 @@ class RuleEvaluator:
                         silently so the surveillance pipeline keeps running.
         """
         self.rules_path = Path(rules_path)
-        self._rules:         list[RuleDefinition] = []
-        self._cooldown_ledger: dict[str, float]   = {}
-        self.bypass:     bool = False
-        self.rule_count: int  = 0
+        self._rules: list[RuleDefinition] = []
+        self._cooldown_ledger: dict[str, float] = {}
+        self.bypass: bool = False
+        self.rule_count: int = 0
 
         self._load_rules()
 
@@ -275,9 +283,9 @@ class RuleEvaluator:
         if self.bypass or not threats:
             return []
 
-        index  = self._build_index(threats)
+        index = self._build_index(threats)
         alerts = []
-        now    = time.time()
+        now = time.time()
 
         for rule in self._rules:
             alert = self._evaluate_rule(rule, index, now)
@@ -286,7 +294,8 @@ class RuleEvaluator:
                 self._cooldown_ledger[rule.name] = now
                 logger.info(
                     "RULE_EVAL | %-25s | FIRED | ids=%s",
-                    rule.name, alert.tracker_ids,
+                    rule.name,
+                    alert.tracker_ids,
                 )
 
         return alerts
@@ -337,14 +346,14 @@ class RuleEvaluator:
             A plain dict suitable for ``json.dumps()`` output.
         """
         return {
-            "bypass":     self.bypass,
+            "bypass": self.bypass,
             "rule_count": self.rule_count,
             "rules_path": str(self.rules_path),
             "rules": [
                 {
-                    "name":             r.name,
-                    "severity":         r.severity.value,
-                    "conditions":       len(r.conditions),
+                    "name": r.name,
+                    "severity": r.severity.value,
+                    "conditions": len(r.conditions),
                     "cooldown_seconds": r.cooldown_seconds,
                 }
                 for r in self._rules
@@ -358,9 +367,9 @@ class RuleEvaluator:
 
     def _evaluate_rule(
         self,
-        rule:  RuleDefinition,
+        rule: RuleDefinition,
         index: FrameIndex,
-        now:   float,
+        now: float,
     ) -> Optional[TriggeredAlert]:
         """
         Evaluate a single rule.  Returns a ``TriggeredAlert`` if it fires,
@@ -389,22 +398,22 @@ class RuleEvaluator:
                 contributing[t.tracker_id] = t
 
         # Build alert
-        tracker_ids     = sorted(contributing.keys())
+        tracker_ids = sorted(contributing.keys())
         threat_snapshots = [contributing[tid].to_dict() for tid in tracker_ids]
 
         return TriggeredAlert(
-            rule_name        = rule.name,
-            triggered_at     = now,
-            tracker_ids      = tracker_ids,
-            threat_snapshots = threat_snapshots,
-            rule_description = rule.description,
-            severity         = rule.severity,
+            rule_name=rule.name,
+            triggered_at=now,
+            tracker_ids=tracker_ids,
+            threat_snapshots=threat_snapshots,
+            rule_description=rule.description,
+            severity=rule.severity,
         )
 
     def _resolve_condition(
         self,
         condition: ConditionSpec,
-        index:     FrameIndex,
+        index: FrameIndex,
     ) -> list["ThreatState"]:
         """
         Find all ThreatStates in the frame that satisfy a single condition.
@@ -440,7 +449,10 @@ class RuleEvaluator:
                 continue
             if condition.zone is not None and condition.zone not in threat.active_zones:
                 continue
-            if condition.min_confidence is not None and threat.confidence < condition.min_confidence:
+            if (
+                condition.min_confidence is not None
+                and threat.confidence < condition.min_confidence
+            ):
                 continue
             result.append(threat)
 
@@ -515,7 +527,7 @@ class RuleEvaluator:
             self._enter_bypass("rules.json contained no valid rule definitions")
             return
 
-        self.bypass     = False
+        self.bypass = False
         self.rule_count = len(self._rules)
         logger.info(
             "RULE_EVAL | Loaded %d rule(s) from %s: [%s]",
@@ -536,14 +548,10 @@ class RuleEvaluator:
             with self.rules_path.open("r", encoding="utf-8") as fh:
                 return json.load(fh)
         except json.JSONDecodeError as exc:
-            logger.error(
-                "RULE_EVAL | rules.json parse error: %s - entering Bypass Mode.", exc
-            )
+            logger.error("RULE_EVAL | rules.json parse error: %s - entering Bypass Mode.", exc)
             return None
         except OSError as exc:
-            logger.error(
-                "RULE_EVAL | rules.json read error: %s - entering Bypass Mode.", exc
-            )
+            logger.error("RULE_EVAL | rules.json read error: %s - entering Bypass Mode.", exc)
             return None
 
     def _parse_rule(self, entry: object) -> Optional[RuleDefinition]:
@@ -583,7 +591,7 @@ class RuleEvaluator:
         for i, cond_raw in enumerate(conditions_raw):
             cond = self._parse_condition(name, i, cond_raw)
             if cond is None:
-                return None   # Any invalid condition invalidates the entire rule.
+                return None  # Any invalid condition invalidates the entire rule.
             conditions.append(cond)
 
         # Optional: cooldown_seconds
@@ -591,36 +599,36 @@ class RuleEvaluator:
         if not isinstance(cooldown, (int, float)) or cooldown < 0:
             logger.warning(
                 "RULE_EVAL | Rule '%s' - invalid 'cooldown_seconds' %r; using 30.0.",
-                name, cooldown,
+                name,
+                cooldown,
             )
             cooldown = 30.0
 
         # Optional: severity (low/high/critical; default high)
         severity_raw = entry.get("severity")
         severity = Severity.from_value(severity_raw)
-        valid_severity = (
-            isinstance(severity_raw, str)
-            and severity_raw.strip().lower() in (s.value for s in Severity)
+        valid_severity = isinstance(severity_raw, str) and severity_raw.strip().lower() in (
+            s.value for s in Severity
         )
         if severity_raw is not None and not valid_severity:
             logger.warning(
                 "RULE_EVAL | Rule '%s' - invalid 'severity' %r; using '%s'.",
-                name, severity_raw, severity.value,
+                name,
+                severity_raw,
+                severity.value,
             )
 
         description = entry.get("description", "")
 
         return RuleDefinition(
-            name             = name.strip(),
-            conditions       = conditions,
-            cooldown_seconds = float(cooldown),
-            severity         = severity,
-            description      = str(description),
+            name=name.strip(),
+            conditions=conditions,
+            cooldown_seconds=float(cooldown),
+            severity=severity,
+            description=str(description),
         )
 
-    def _parse_condition(
-        self, rule_name: str, idx: int, entry: object
-    ) -> Optional[ConditionSpec]:
+    def _parse_condition(self, rule_name: str, idx: int, entry: object) -> Optional[ConditionSpec]:
         """
         Validate and compile a single condition dict into a ``ConditionSpec``.
 
@@ -642,8 +650,8 @@ class RuleEvaluator:
             logger.warning("%s - must be a JSON object, got %r", prefix, entry)
             return None
 
-        class_name     = entry.get("class_name")
-        zone           = entry.get("zone")
+        class_name = entry.get("class_name")
+        zone = entry.get("zone")
         min_confidence = entry.get("min_confidence")
 
         # Field-level validation
@@ -670,17 +678,16 @@ class RuleEvaluator:
             return None
 
         return ConditionSpec(
-            class_name     = class_name,
-            zone           = zone,
-            min_confidence = float(min_confidence) if min_confidence is not None else None,
+            class_name=class_name,
+            zone=zone,
+            min_confidence=float(min_confidence) if min_confidence is not None else None,
         )
 
     def _enter_bypass(self, reason: str) -> None:
         """Activate Bypass Mode and emit a single INFO-level log entry."""
-        self.bypass     = True
+        self.bypass = True
         self.rule_count = 0
         logger.info(
-            "RULE_EVAL | Bypass Mode active - %s. "
-            "evaluate() will return [] every frame.",
+            "RULE_EVAL | Bypass Mode active - %s. evaluate() will return [] every frame.",
             reason,
         )

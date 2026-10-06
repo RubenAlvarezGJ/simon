@@ -1,11 +1,14 @@
-from ultralytics import YOLO
 import cv2
 import supervision as sv
+from ultralytics import YOLO
 
 from cv_layer.device import resolve_device
 
+
 class YOLODetector:
-    def __init__(self, model_path="models/yolov8n.pt", confidence_threshold=0.6, device: str | None = None):
+    def __init__(
+        self, model_path="models/yolov8n.pt", confidence_threshold=0.6, device: str | None = None
+    ):
         """
         Initializes the YOLO object detector.
 
@@ -22,9 +25,9 @@ class YOLODetector:
 
         self.box_annotator = sv.BoxAnnotator(color=sv.Color.RED, thickness=1)
         self.label_annotator = sv.LabelAnnotator(color=sv.Color.RED, text_color=sv.Color.BLACK)
-    
+
     def detect(self, frame):
-        """  
+        """
         Runs object detection on a single frame.
 
         Parameters:
@@ -49,7 +52,7 @@ class YOLODetector:
 
         # Filter confidence threshold
         detections = detections[detections.confidence >= self.confidence_threshold]
-        
+
         return detections
 
     def visualize(self, frame, detections: sv.Detections, fps=None):
@@ -66,9 +69,11 @@ class YOLODetector:
 
         labels = []
         for class_id, confidence, tracker_id in zip(
-            detections.class_id, 
-            detections.confidence, 
-            detections.tracker_id if detections.tracker_id is not None else [None] * len(detections)
+            detections.class_id,
+            detections.confidence,
+            detections.tracker_id
+            if detections.tracker_id is not None
+            else [None] * len(detections),
         ):
             class_name = self.model.names[class_id]
             if tracker_id is not None:
@@ -76,9 +81,7 @@ class YOLODetector:
             else:
                 labels.append(f"{class_name} {confidence:.2f}")
 
-        annotated_frame = self.box_annotator.annotate(
-            scene=frame, detections=detections
-        )
+        annotated_frame = self.box_annotator.annotate(scene=frame, detections=detections)
 
         annotated_frame = self.label_annotator.annotate(
             scene=annotated_frame, detections=detections, labels=labels
@@ -86,13 +89,13 @@ class YOLODetector:
 
         if fps is not None:
             cv2.putText(
-                annotated_frame, 
-                f"FPS: {fps:.1f}", 
+                annotated_frame,
+                f"FPS: {fps:.1f}",
                 (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 
-                1, 
-                (0, 255, 0), 
-                2
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 255, 0),
+                2,
             )
 
         return annotated_frame

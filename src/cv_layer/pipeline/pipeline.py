@@ -1,12 +1,13 @@
+import logging
 import queue
 import threading
-import logging
-from typing import Generator, Any
+from typing import Any, Generator
 
-from .video_reader import VideoReader
 from .detection_engine import DetectionEngine
+from .video_reader import VideoReader
 
 logger = logging.getLogger(__name__)
+
 
 class VideoPipeline:
     """
@@ -122,7 +123,7 @@ class VideoPipeline:
         """
         Gracefully shut down the entire pipeline.
 
-        Sets the shared stop_event, then joins both threads in correct dependency 
+        Sets the shared stop_event, then joins both threads in correct dependency
         order (reader first, then engine) so the engine always drains any incoming
         frames before exiting.
 

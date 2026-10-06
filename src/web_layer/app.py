@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from recorder.video_manager import RetentionConfig, VideoManager
 from recorder.video_recorder import VideoRecorder
+
 from .pipeline_runner import PipelineRunner
 from .routes import events as events_routes
 from .routes import rules as rules_routes
@@ -81,8 +82,7 @@ def create_app(
                 recorder = VideoRecorder(source=source, destination=footage_path)
             else:
                 logger.info(
-                    "FastAPI lifespan: recorder autostart skipped; source %r is "
-                    "not an RTSP URL",
+                    "FastAPI lifespan: recorder autostart skipped; source %r is not an RTSP URL",
                     source,
                 )
         if recorder is not None:

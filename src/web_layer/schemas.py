@@ -1,5 +1,4 @@
-"""Pydantic v2 request/response schemas for the frontend API.
-"""
+"""Pydantic v2 request/response schemas for the frontend API."""
 
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ from pydantic import (
     conlist,
     model_validator,
 )
-
 
 # ---------------------------------------------------------------------------
 # Rules
@@ -29,13 +27,9 @@ class ConditionSchema(BaseModel):
 
     @model_validator(mode="after")
     def _require_at_least_one_field(self) -> "ConditionSchema":
-        if all(
-            v is None
-            for v in (self.class_name, self.zone, self.min_confidence)
-        ):
+        if all(v is None for v in (self.class_name, self.zone, self.min_confidence)):
             raise ValueError(
-                "Condition must set at least one of: "
-                "class_name, zone, min_confidence."
+                "Condition must set at least one of: class_name, zone, min_confidence."
             )
         return self
 

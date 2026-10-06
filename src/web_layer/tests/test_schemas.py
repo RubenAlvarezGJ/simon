@@ -69,9 +69,7 @@ class TestRuleSchema:
 
 class TestRulesPayload:
     def test_round_trip(self) -> None:
-        payload = RulesPayload(
-            rules=[{"name": "r1", "conditions": [{"class_name": "handgun"}]}]
-        )
+        payload = RulesPayload(rules=[{"name": "r1", "conditions": [{"class_name": "handgun"}]}])
         assert payload.rules[0].name == "r1"
 
     def test_empty_rules_accepted(self) -> None:
@@ -82,9 +80,7 @@ class TestRulesPayload:
 
 class TestZonesPayload:
     def test_round_trip(self) -> None:
-        payload = ZonesPayload.model_validate(
-            {"porch": [[0, 0], [10, 0], [10, 10], [0, 10]]}
-        )
+        payload = ZonesPayload.model_validate({"porch": [[0, 0], [10, 0], [10, 10], [0, 10]]})
         assert "porch" in payload.root
         assert len(payload.root["porch"]) == 4
 

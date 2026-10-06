@@ -165,14 +165,18 @@ class RuntimeState:
     # Read-side helpers
     # ------------------------------------------------------------------
 
-    def wait_for_frame(self, last_id: int, timeout: Optional[float] = None) -> tuple[int, Optional[bytes]]:
+    def wait_for_frame(
+        self, last_id: int, timeout: Optional[float] = None
+    ) -> tuple[int, Optional[bytes]]:
         """Block (in a thread) until a frame newer than ``last_id`` is published.
 
         Returns ``(frame_id, jpeg_bytes)``. If ``timeout`` elapses without a
         new frame, returns the current state regardless (caller must check).
         """
         with self.frame_cond:
-            self.frame_cond.wait_for(lambda: self.frame_id > last_id or self.shutdown_flag, timeout=timeout)
+            self.frame_cond.wait_for(
+                lambda: self.frame_id > last_id or self.shutdown_flag, timeout=timeout
+            )
             return self.frame_id, self.jpeg_bytes
 
     def alert_tally_snapshot(self) -> dict[str, Any]:
@@ -191,7 +195,7 @@ class RuntimeState:
             "frame_id": self.frame_id,
             "frame_shape": self.frame_shape,
         }
-    
+
     def notify_shutdown(self):
         with self.frame_cond:
             self.shutdown_flag = True

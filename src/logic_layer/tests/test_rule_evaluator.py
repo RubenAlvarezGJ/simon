@@ -6,50 +6,48 @@ import pytest
 
 from logic_layer.rule_evaluator import (
     RuleEvaluator,
-    TriggeredAlert,
-    ConditionSpec,
-    RuleDefinition,
     Severity,
+    TriggeredAlert,
 )
-
 
 # ===========================================================================
 # MockThreatState stub
 # ===========================================================================
+
 
 class MockThreatState:
     """Minimal ThreatState stand-in satisfying the RuleEvaluator's read contract."""
 
     def __init__(
         self,
-        tracker_id:   int,
-        class_name:   str,
-        confidence:   float = 0.90,
+        tracker_id: int,
+        class_name: str,
+        confidence: float = 0.90,
         active_zones: list[str] | None = None,
     ):
-        self.tracker_id   = tracker_id
-        self.class_name   = class_name
-        self.confidence   = confidence
+        self.tracker_id = tracker_id
+        self.class_name = class_name
+        self.confidence = confidence
         self.active_zones = active_zones if active_zones is not None else ["global"]
 
     def to_dict(self) -> dict:
         return {
-            "tracker_id":   self.tracker_id,
-            "class_name":   self.class_name,
-            "confidence":   self.confidence,
+            "tracker_id": self.tracker_id,
+            "class_name": self.class_name,
+            "confidence": self.confidence,
             "active_zones": self.active_zones,
         }
 
     def __repr__(self):
         return (
-            f"MockThreat(id={self.tracker_id}, cls={self.class_name!r}, "
-            f"zones={self.active_zones})"
+            f"MockThreat(id={self.tracker_id}, cls={self.class_name!r}, zones={self.active_zones})"
         )
 
 
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def write_rules(tmp_path, data: dict) -> str:
     p = tmp_path / "rules.json"
@@ -73,8 +71,8 @@ def single_rule(
 # Bypass Mode
 # ===========================================================================
 
-class TestBypassMode:
 
+class TestBypassMode:
     def test_missing_file_activates_bypass(self, tmp_path):
         ev = RuleEvaluator(rules_path=str(tmp_path / "nope.json"))
         assert ev.bypass is True
@@ -111,8 +109,8 @@ class TestBypassMode:
 # Rule Loading & Validation
 # ===========================================================================
 
-class TestRuleLoading:
 
+class TestRuleLoading:
     def test_valid_rule_loads(self, tmp_path):
         path = write_rules(tmp_path, single_rule([{"class_name": "handgun"}]))
         ev = RuleEvaluator(rules_path=path)
@@ -120,27 +118,33 @@ class TestRuleLoading:
         assert ev.rule_count == 1
 
     def test_multiple_rules_loaded(self, tmp_path):
-        data = {"rules": [
-            {"name": "R1", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 10},
-            {"name": "R2", "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 20},
-        ]}
+        data = {
+            "rules": [
+                {"name": "R1", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 10},
+                {"name": "R2", "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 20},
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         assert ev.rule_count == 2
 
     def test_rule_missing_name_skipped(self, tmp_path):
-        data = {"rules": [
-            {"conditions": [{"class_name": "handgun"}]},          # no name — invalid
-            {"name": "Good", "conditions": [{"class_name": "crowbar"}]},
-        ]}
+        data = {
+            "rules": [
+                {"conditions": [{"class_name": "handgun"}]},  # no name — invalid
+                {"name": "Good", "conditions": [{"class_name": "crowbar"}]},
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         assert ev.rule_count == 1
         assert ev._rules[0].name == "Good"
 
     def test_rule_missing_conditions_skipped(self, tmp_path):
-        data = {"rules": [
-            {"name": "Bad"},
-            {"name": "Good", "conditions": [{"class_name": "handgun"}]},
-        ]}
+        data = {
+            "rules": [
+                {"name": "Bad"},
+                {"name": "Good", "conditions": [{"class_name": "handgun"}]},
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         assert ev.rule_count == 1
 
@@ -155,12 +159,20 @@ class TestRuleLoading:
         assert ev._rules[0].cooldown_seconds == 30.0
 
     def test_invalid_cooldown_uses_default(self, tmp_path):
-        data = {"rules": [{"name": "R", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": -5}]}
+        data = {
+            "rules": [
+                {"name": "R", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": -5}
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         assert ev._rules[0].cooldown_seconds == 30.0
 
     def test_description_preserved(self, tmp_path):
-        data = {"rules": [{"name": "R", "description": "My rule", "conditions": [{"class_name": "handgun"}]}]}
+        data = {
+            "rules": [
+                {"name": "R", "description": "My rule", "conditions": [{"class_name": "handgun"}]}
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         assert ev._rules[0].description == "My rule"
 
@@ -169,8 +181,8 @@ class TestRuleLoading:
 # Severity parsing
 # ===========================================================================
 
-class TestSeverityParsing:
 
+class TestSeverityParsing:
     @pytest.mark.parametrize("level", ["low", "high", "critical"])
     def test_explicit_severity_parsed(self, tmp_path, level):
         path = write_rules(tmp_path, single_rule([{"class_name": "handgun"}], severity=level))
@@ -212,8 +224,8 @@ class TestSeverityParsing:
 # Condition Validation
 # ===========================================================================
 
-class TestConditionValidation:
 
+class TestConditionValidation:
     def test_empty_condition_invalidates_rule(self, tmp_path):
         data = {"rules": [{"name": "Bad", "conditions": [{}]}]}
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
@@ -246,17 +258,21 @@ class TestConditionValidation:
 # Evaluation — Single Condition Rules
 # ===========================================================================
 
-class TestSingleConditionEvaluation:
 
+class TestSingleConditionEvaluation:
     def test_class_name_match_fires(self, tmp_path):
-        ev = RuleEvaluator(rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun"}])))
+        ev = RuleEvaluator(
+            rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun"}]))
+        )
         threats = [MockThreatState(1, "handgun")]
         alerts = ev.evaluate(threats)
         assert len(alerts) == 1
         assert alerts[0].rule_name == "TestRule"
 
     def test_class_name_no_match(self, tmp_path):
-        ev = RuleEvaluator(rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun"}])))
+        ev = RuleEvaluator(
+            rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun"}]))
+        )
         threats = [MockThreatState(1, "crowbar")]
         assert ev.evaluate(threats) == []
 
@@ -272,17 +288,29 @@ class TestSingleConditionEvaluation:
         assert ev.evaluate(threats) == []
 
     def test_min_confidence_above_threshold_fires(self, tmp_path):
-        ev = RuleEvaluator(rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun", "min_confidence": 0.7}])))
+        ev = RuleEvaluator(
+            rules_path=write_rules(
+                tmp_path, single_rule([{"class_name": "handgun", "min_confidence": 0.7}])
+            )
+        )
         threats = [MockThreatState(1, "handgun", confidence=0.85)]
         assert len(ev.evaluate(threats)) == 1
 
     def test_min_confidence_below_threshold_no_fire(self, tmp_path):
-        ev = RuleEvaluator(rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun", "min_confidence": 0.7}])))
+        ev = RuleEvaluator(
+            rules_path=write_rules(
+                tmp_path, single_rule([{"class_name": "handgun", "min_confidence": 0.7}])
+            )
+        )
         threats = [MockThreatState(1, "handgun", confidence=0.50)]
         assert ev.evaluate(threats) == []
 
     def test_exactly_at_confidence_threshold_fires(self, tmp_path):
-        ev = RuleEvaluator(rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun", "min_confidence": 0.7}])))
+        ev = RuleEvaluator(
+            rules_path=write_rules(
+                tmp_path, single_rule([{"class_name": "handgun", "min_confidence": 0.7}])
+            )
+        )
         threats = [MockThreatState(1, "handgun", confidence=0.70)]
         assert len(ev.evaluate(threats)) == 1
 
@@ -291,37 +319,43 @@ class TestSingleConditionEvaluation:
 # Evaluation — Compound Rules (AND logic)
 # ===========================================================================
 
-class TestCompoundRuleEvaluation:
 
+class TestCompoundRuleEvaluation:
     def test_both_conditions_satisfied_fires(self, tmp_path):
         """Person on porch AND a tool present: both present → fires."""
-        rule = single_rule([
-            {"class_name": "person", "zone": "porch"},
-            {"class_name": "crowbar"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "person", "zone": "porch"},
+                {"class_name": "crowbar"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         threats = [
-            MockThreatState(1, "person",  active_zones=["porch"]),
+            MockThreatState(1, "person", active_zones=["porch"]),
             MockThreatState(2, "crowbar", active_zones=["global"]),
         ]
         alerts = ev.evaluate(threats)
         assert len(alerts) == 1
 
     def test_first_condition_missing_does_not_fire(self, tmp_path):
-        rule = single_rule([
-            {"class_name": "person", "zone": "porch"},
-            {"class_name": "crowbar"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "person", "zone": "porch"},
+                {"class_name": "crowbar"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         # No person on porch
         threats = [MockThreatState(2, "crowbar", active_zones=["global"])]
         assert ev.evaluate(threats) == []
 
     def test_second_condition_missing_does_not_fire(self, tmp_path):
-        rule = single_rule([
-            {"class_name": "person", "zone": "porch"},
-            {"class_name": "handgun"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "person", "zone": "porch"},
+                {"class_name": "handgun"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         # Person on porch but no weapon
         threats = [MockThreatState(1, "person", active_zones=["porch"])]
@@ -329,10 +363,12 @@ class TestCompoundRuleEvaluation:
 
     def test_single_threat_satisfies_multiple_conditions(self, tmp_path):
         """One object can satisfy both conditions in a compound rule."""
-        rule = single_rule([
-            {"class_name": "crowbar"},
-            {"zone": "porch"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "crowbar"},
+                {"zone": "porch"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         threats = [MockThreatState(1, "crowbar", active_zones=["porch"])]
         alerts = ev.evaluate(threats)
@@ -340,29 +376,33 @@ class TestCompoundRuleEvaluation:
         assert alerts[0].tracker_ids == [1]
 
     def test_three_condition_rule_all_satisfied(self, tmp_path):
-        rule = single_rule([
-            {"class_name": "person"},
-            {"class_name": "handgun"},
-            {"zone": "driveway"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "person"},
+                {"class_name": "handgun"},
+                {"zone": "driveway"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         threats = [
-            MockThreatState(1, "person",  active_zones=["driveway"]),
+            MockThreatState(1, "person", active_zones=["driveway"]),
             MockThreatState(2, "handgun", active_zones=["driveway"]),
         ]
         alerts = ev.evaluate(threats)
         assert len(alerts) == 1
 
     def test_three_condition_rule_one_unsatisfied(self, tmp_path):
-        rule = single_rule([
-            {"class_name": "person"},
-            {"class_name": "handgun"},
-            {"zone": "driveway"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "person"},
+                {"class_name": "handgun"},
+                {"zone": "driveway"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         # No weapon present
         threats = [
-            MockThreatState(1, "person",  active_zones=["driveway"]),
+            MockThreatState(1, "person", active_zones=["driveway"]),
             MockThreatState(2, "crowbar", active_zones=["driveway"]),
         ]
         assert ev.evaluate(threats) == []
@@ -372,8 +412,8 @@ class TestCompoundRuleEvaluation:
 # TriggeredAlert Payload
 # ===========================================================================
 
-class TestTriggeredAlertPayload:
 
+class TestTriggeredAlertPayload:
     def _fire(self, tmp_path, threats) -> TriggeredAlert:
         rule = single_rule([{"class_name": "handgun"}])
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
@@ -387,8 +427,8 @@ class TestTriggeredAlertPayload:
 
     def test_alert_triggered_at_is_recent(self, tmp_path):
         before = time.time()
-        alert  = self._fire(tmp_path, [MockThreatState(1, "handgun")])
-        after  = time.time()
+        alert = self._fire(tmp_path, [MockThreatState(1, "handgun")])
+        after = time.time()
         assert before <= alert.triggered_at <= after
 
     def test_alert_contains_correct_tracker_ids(self, tmp_path):
@@ -419,18 +459,21 @@ class TestTriggeredAlertPayload:
 
     def test_alert_to_dict_is_json_serialisable(self, tmp_path):
         import json
+
         alert = self._fire(tmp_path, [MockThreatState(1, "handgun")])
         json.dumps(alert.to_dict())  # Must not raise
 
     def test_compound_rule_union_of_tracker_ids(self, tmp_path):
         """All contributing threat IDs from all conditions must be in the alert."""
-        rule = single_rule([
-            {"class_name": "person", "zone": "porch"},
-            {"class_name": "crowbar"},
-        ])
+        rule = single_rule(
+            [
+                {"class_name": "person", "zone": "porch"},
+                {"class_name": "crowbar"},
+            ]
+        )
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         threats = [
-            MockThreatState(10, "person",  active_zones=["porch"]),
+            MockThreatState(10, "person", active_zones=["porch"]),
             MockThreatState(20, "crowbar"),
         ]
         alerts = ev.evaluate(threats)
@@ -441,17 +484,17 @@ class TestTriggeredAlertPayload:
 # Cooldown
 # ===========================================================================
 
-class TestCooldown:
 
+class TestCooldown:
     def test_rule_does_not_fire_within_cooldown(self, tmp_path):
         rule = single_rule([{"class_name": "handgun"}], cooldown=60.0)
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, rule))
         threats = [MockThreatState(1, "handgun")]
 
-        first  = ev.evaluate(threats)
+        first = ev.evaluate(threats)
         second = ev.evaluate(threats)
 
-        assert len(first)  == 1
+        assert len(first) == 1
         assert len(second) == 0
 
     def test_rule_fires_again_after_cooldown_expires(self, tmp_path):
@@ -460,17 +503,19 @@ class TestCooldown:
         threats = [MockThreatState(1, "handgun")]
 
         ev.evaluate(threats)
-        time.sleep(0.07)          # Exceed 0.05 s cooldown
+        time.sleep(0.07)  # Exceed 0.05 s cooldown
         second = ev.evaluate(threats)
 
         assert len(second) == 1
 
     def test_cooldown_is_per_rule_independent(self, tmp_path):
         """Two rules with independent cooldowns should behave independently."""
-        data = {"rules": [
-            {"name": "R1", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 60.0},
-            {"name": "R2", "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 60.0},
-        ]}
+        data = {
+            "rules": [
+                {"name": "R1", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 60.0},
+                {"name": "R2", "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 60.0},
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
 
         threats = [
@@ -478,7 +523,7 @@ class TestCooldown:
             MockThreatState(2, "crowbar"),
         ]
 
-        first = ev.evaluate(threats)   # Both fire
+        first = ev.evaluate(threats)  # Both fire
         assert len(first) == 2
 
         second = ev.evaluate(threats)  # Both in cooldown
@@ -494,7 +539,9 @@ class TestCooldown:
         assert 0 < cd["TestRule"] <= 60.0
 
     def test_active_cooldowns_empty_before_any_fire(self, tmp_path):
-        ev = RuleEvaluator(rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun"}])))
+        ev = RuleEvaluator(
+            rules_path=write_rules(tmp_path, single_rule([{"class_name": "handgun"}]))
+        )
         assert ev.active_cooldowns() == {}
 
     def test_active_cooldowns_clears_after_expiry(self, tmp_path):
@@ -509,8 +556,8 @@ class TestCooldown:
 # FrameIndex construction
 # ===========================================================================
 
-class TestFrameIndex:
 
+class TestFrameIndex:
     def test_index_groups_by_class(self, tmp_path):
         ev = RuleEvaluator.__new__(RuleEvaluator)
         threats = [
@@ -541,13 +588,23 @@ class TestFrameIndex:
 # Multiple rules in a single frame
 # ===========================================================================
 
-class TestMultipleRules:
 
+class TestMultipleRules:
     def test_two_rules_both_fire(self, tmp_path):
-        data = {"rules": [
-            {"name": "WeaponAlert", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 0},
-            {"name": "ToolAlert",   "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 0},
-        ]}
+        data = {
+            "rules": [
+                {
+                    "name": "WeaponAlert",
+                    "conditions": [{"class_name": "handgun"}],
+                    "cooldown_seconds": 0,
+                },
+                {
+                    "name": "ToolAlert",
+                    "conditions": [{"class_name": "crowbar"}],
+                    "cooldown_seconds": 0,
+                },
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         threats = [
             MockThreatState(1, "handgun"),
@@ -560,10 +617,22 @@ class TestMultipleRules:
     def test_mixed_severities_fire_independently(self, tmp_path):
         """A low and a critical rule can both fire in the same frame, each
         carrying its own severity."""
-        data = {"rules": [
-            {"name": "WeaponAlert", "severity": "critical", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 0},
-            {"name": "ToolAlert",   "severity": "low",      "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 0},
-        ]}
+        data = {
+            "rules": [
+                {
+                    "name": "WeaponAlert",
+                    "severity": "critical",
+                    "conditions": [{"class_name": "handgun"}],
+                    "cooldown_seconds": 0,
+                },
+                {
+                    "name": "ToolAlert",
+                    "severity": "low",
+                    "conditions": [{"class_name": "crowbar"}],
+                    "cooldown_seconds": 0,
+                },
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         threats = [
             MockThreatState(1, "handgun"),
@@ -575,10 +644,20 @@ class TestMultipleRules:
         assert by_name["ToolAlert"] == Severity.LOW
 
     def test_only_matching_rule_fires(self, tmp_path):
-        data = {"rules": [
-            {"name": "WeaponAlert", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 0},
-            {"name": "ToolAlert",   "conditions": [{"class_name": "crowbar"}], "cooldown_seconds": 0},
-        ]}
+        data = {
+            "rules": [
+                {
+                    "name": "WeaponAlert",
+                    "conditions": [{"class_name": "handgun"}],
+                    "cooldown_seconds": 0,
+                },
+                {
+                    "name": "ToolAlert",
+                    "conditions": [{"class_name": "crowbar"}],
+                    "cooldown_seconds": 0,
+                },
+            ]
+        }
         ev = RuleEvaluator(rules_path=write_rules(tmp_path, data))
         # Only a weapon present
         threats = [MockThreatState(1, "handgun")]
@@ -591,8 +670,8 @@ class TestMultipleRules:
 # Hot-reload
 # ===========================================================================
 
-class TestHotReload:
 
+class TestHotReload:
     def test_reload_loads_new_rules(self, tmp_path):
         rules_file = tmp_path / "rules.json"
         ev = RuleEvaluator(rules_path=str(rules_file))
@@ -609,7 +688,11 @@ class TestHotReload:
 
     def test_reload_preserves_cooldown_ledger(self, tmp_path):
         """Cooldowns already in progress must survive a hot-reload."""
-        data = {"rules": [{"name": "R", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 60}]}
+        data = {
+            "rules": [
+                {"name": "R", "conditions": [{"class_name": "handgun"}], "cooldown_seconds": 60}
+            ]
+        }
         path = write_rules(tmp_path, data)
         ev = RuleEvaluator(rules_path=path)
 
@@ -634,8 +717,8 @@ class TestHotReload:
 # Diagnostics
 # ===========================================================================
 
-class TestDiagnostics:
 
+class TestDiagnostics:
     def test_diagnostics_bypass_mode(self, tmp_path):
         ev = RuleEvaluator(rules_path=str(tmp_path / "nope.json"))
         d = ev.diagnostics()
@@ -644,7 +727,9 @@ class TestDiagnostics:
         assert d["rules"] == []
 
     def test_diagnostics_loaded_mode(self, tmp_path):
-        path = write_rules(tmp_path, single_rule([{"class_name": "handgun"}], cooldown=45.0, severity="critical"))
+        path = write_rules(
+            tmp_path, single_rule([{"class_name": "handgun"}], cooldown=45.0, severity="critical")
+        )
         ev = RuleEvaluator(rules_path=path)
         d = ev.diagnostics()
         assert d["bypass"] is False
@@ -655,6 +740,7 @@ class TestDiagnostics:
 
     def test_diagnostics_is_json_serialisable(self, tmp_path):
         import json
+
         path = write_rules(tmp_path, single_rule([{"class_name": "handgun"}]))
         ev = RuleEvaluator(rules_path=path)
         json.dumps(ev.diagnostics())
@@ -663,6 +749,7 @@ class TestDiagnostics:
 # ===========================================================================
 # Sample rules.json integration test
 # ===========================================================================
+
 
 class TestSampleRulesJson:
     """Smoke-test a rules.json placed alongside this test file, if present."""
@@ -682,4 +769,5 @@ class TestSampleRulesJson:
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v"])

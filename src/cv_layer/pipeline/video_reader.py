@@ -1,11 +1,12 @@
-import cv2 as cv
+import logging
 import queue
 import threading
-import logging
-from pathlib import Path
 from typing import Self
 
+import cv2 as cv
+
 logger = logging.getLogger(__name__)
+
 
 class VideoReader:
     """
@@ -43,7 +44,7 @@ class VideoReader:
         max_queue_size: int = 4,
         drop_if_full: bool = True,
     ) -> None:
-        
+
         self._source = source
         self._output_queue = output_queue
         self._stop_event = stop_event
@@ -173,8 +174,7 @@ class VideoReader:
             except queue.Full:
                 self._frames_dropped += 1
                 logger.debug(
-                    "VideoReader: frame dropped (queue full). "
-                    "total_dropped=%d",
+                    "VideoReader: frame dropped (queue full). total_dropped=%d",
                     self._frames_dropped,
                 )
         else:
