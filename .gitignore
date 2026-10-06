@@ -9,3 +9,6 @@ __pycache__/
 web/node_modules/
 web/dist/
 src/config/
+
+CONTEXT.md
+skills-lock.json

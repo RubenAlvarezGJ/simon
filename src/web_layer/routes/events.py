@@ -14,7 +14,7 @@ from logic_layer.rule_evaluator import Severity
 from ..runtime_state import RuntimeState
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI
+    pass
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

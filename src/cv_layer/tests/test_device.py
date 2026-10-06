@@ -7,13 +7,11 @@ same assertions hold on a CUDA laptop and a CPU-only mini PC.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import pytest
 import torch
 
 from cv_layer.device import resolve_device, resolve_model_path
-
 
 # ---------------------------------------------------------------------------
 # resolve_device

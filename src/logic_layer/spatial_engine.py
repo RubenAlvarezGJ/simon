@@ -2,9 +2,9 @@
 Zone Configuration (``zones.json``) format::
 
     {
-        "driveway":   [[120, 400], [520, 400], [640, 720], [0, 720]],
-        "porch":      [[200, 280], [440, 280], [440, 400], [200, 400]],
-        "street_bg":  [[0, 0],    [640, 0],   [640, 240], [0, 240]]
+        "driveway": [[120, 400], [520, 400], [640, 720], [0, 720]],
+        "porch": [[200, 280], [440, 280], [440, 400], [200, 400]],
+        "street_bg": [[0, 0], [640, 0], [640, 240], [0, 240]],
     }
 
 """
@@ -13,17 +13,17 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
-import numpy as np
-import supervision as sv
 
 # Avoid a circular import: ThreatState lives in state_manager.
 # We use TYPE_CHECKING so the hint is available to type-checkers
 # without importing the module at runtime if it isn't already loaded.
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
+import numpy as np
+import supervision as sv
+
 if TYPE_CHECKING:
     from state_manager import ThreatState
 
@@ -39,6 +39,7 @@ GLOBAL_ZONE = "global"
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ZoneDefinition:
     """
@@ -52,9 +53,11 @@ class ZoneDefinition:
                 avoid repeated allocations inside the evaluation loop.
         vertex_count: Stored for diagnostic / logging purposes only.
     """
-    name:         str
-    zone:         sv.PolygonZone
+
+    name: str
+    zone: sv.PolygonZone
     vertex_count: int
+
 
 class SpatialEngine:
     """
@@ -101,9 +104,9 @@ class SpatialEngine:
                         so the surveillance pipeline keeps running.
         """
         self.zones_path = Path(zones_path)
-        self._zones:     list[ZoneDefinition] = []
-        self.bypass:     bool  = False
-        self.zone_count: int   = 0
+        self._zones: list[ZoneDefinition] = []
+        self.bypass: bool = False
+        self.zone_count: int = 0
 
         self._load_zones()
 
@@ -145,7 +148,7 @@ class SpatialEngine:
 
         if not threats:
             return
-        
+
         bboxes = np.array([t.bbox for t in threats], dtype=float)
         detections = sv.Detections(xyxy=bboxes)
 
@@ -162,7 +165,8 @@ class SpatialEngine:
                 threat.active_zones.append(GLOBAL_ZONE)
                 logger.debug(
                     "SPATIAL   | ID %-4d | %-15s | no zone match -> global",
-                    threat.tracker_id, threat.class_name,
+                    threat.tracker_id,
+                    threat.class_name,
                 )
 
     def reload(self) -> bool:
@@ -187,23 +191,17 @@ class SpatialEngine:
             A plain dict suitable for ``json.dumps()`` output, containing::
 
                 {
-                    "bypass":        bool,
-                    "zone_count":    int,
-                    "zones_path":    str,
-                    "zones": [
-                        {"name": "driveway", "vertices": 4},
-                        ...
-                    ]
+                    "bypass": bool,
+                    "zone_count": int,
+                    "zones_path": str,
+                    "zones": [{"name": "driveway", "vertices": 4}, ...],
                 }
         """
         return {
-            "bypass":     self.bypass,
+            "bypass": self.bypass,
             "zone_count": self.zone_count,
             "zones_path": str(self.zones_path),
-            "zones": [
-                {"name": z.name, "vertices": z.vertex_count}
-                for z in self._zones
-            ],
+            "zones": [{"name": z.name, "vertices": z.vertex_count} for z in self._zones],
         }
 
     # -----------------------------------------------------------------------
@@ -241,7 +239,7 @@ class SpatialEngine:
             self._enter_bypass("zones.json contained no valid polygon definitions")
             return
 
-        self.bypass     = False
+        self.bypass = False
         self.zone_count = len(self._zones)
         logger.info(
             "SPATIAL   | Loaded %d zone(s) from %s: [%s]",
@@ -267,19 +265,13 @@ class SpatialEngine:
             with self.zones_path.open("r", encoding="utf-8") as fh:
                 return json.load(fh)
         except json.JSONDecodeError as exc:
-            logger.error(
-                "SPATIAL   | zones.json parse error: %s — entering Bypass Mode.", exc
-            )
+            logger.error("SPATIAL   | zones.json parse error: %s — entering Bypass Mode.", exc)
             return None
         except OSError as exc:
-            logger.error(
-                "SPATIAL   | zones.json read error: %s — entering Bypass Mode.", exc
-            )
+            logger.error("SPATIAL   | zones.json read error: %s — entering Bypass Mode.", exc)
             return None
 
-    def _build_zone(
-        self, name: str, vertices: object
-    ) -> Optional[ZoneDefinition]:
+    def _build_zone(self, name: str, vertices: object) -> Optional[ZoneDefinition]:
         """
         Validate a single zone entry and compile it into a ``ZoneDefinition``.
 
@@ -299,14 +291,16 @@ class SpatialEngine:
         if not isinstance(vertices, list):
             logger.warning(
                 "SPATIAL   | Zone '%s' skipped — vertices must be a list, got %s.",
-                name, type(vertices).__name__,
+                name,
+                type(vertices).__name__,
             )
             return None
 
         if len(vertices) < 3:
             logger.warning(
                 "SPATIAL   | Zone '%s' skipped — polygon needs ≥3 vertices, got %d.",
-                name, len(vertices),
+                name,
+                len(vertices),
             )
             return None
 
@@ -317,9 +311,10 @@ class SpatialEngine:
                 or not all(isinstance(c, (int, float)) for c in point)
             ):
                 logger.warning(
-                    "SPATIAL   | Zone '%s' skipped — vertex[%d] is not a valid "
-                    "[x, y] pair: %r",
-                    name, i, point,
+                    "SPATIAL   | Zone '%s' skipped — vertex[%d] is not a valid [x, y] pair: %r",
+                    name,
+                    i,
+                    point,
                 )
                 return None
 
@@ -330,17 +325,14 @@ class SpatialEngine:
             triggering_anchors=[sv.Position.BOTTOM_CENTER],
         )
 
-        logger.debug(
-            "SPATIAL   | Zone '%s' compiled — %d vertices.", name, len(vertices)
-        )
+        logger.debug("SPATIAL   | Zone '%s' compiled — %d vertices.", name, len(vertices))
         return ZoneDefinition(name=name, zone=zone, vertex_count=len(vertices))
 
     def _enter_bypass(self, reason: str) -> None:
         """Set Bypass Mode and emit a single INFO-level log entry."""
-        self.bypass     = True
+        self.bypass = True
         self.zone_count = 0
         logger.info(
-            "SPATIAL   | Bypass Mode active — %s. "
-            "All threats will be tagged ['global'].",
+            "SPATIAL   | Bypass Mode active — %s. All threats will be tagged ['global'].",
             reason,
         )

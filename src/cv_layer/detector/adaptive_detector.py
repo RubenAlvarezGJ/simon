@@ -1,14 +1,25 @@
 import cv2
 import supervision as sv
+
 from cv_layer.detector.yolo_detector import YOLODetector
 
+
 class AdaptiveDetector:
-    def __init__(self, model_path, inference_interval=3, motion_ratio_threshold=0.0015, motion_target_width=480, device: str | None = None):
+    def __init__(
+        self,
+        model_path,
+        inference_interval=3,
+        motion_ratio_threshold=0.0015,
+        motion_target_width=480,
+        device: str | None = None,
+    ):
         self.detector = YOLODetector(model_path, device=device)
         self.tracker = sv.ByteTrack()
-        self.inference_interval = inference_interval            # base cadence
-        self.motion_ratio_threshold = motion_ratio_threshold    # fraction of frame area, resolution-independent
-        self.motion_target_width = motion_target_width          # downscale toward this width
+        self.inference_interval = inference_interval  # base cadence
+        self.motion_ratio_threshold = (
+            motion_ratio_threshold  # fraction of frame area, resolution-independent
+        )
+        self.motion_target_width = motion_target_width  # downscale toward this width
         self.frame_count = 0
         self.last_detections = sv.Detections.empty()
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
@@ -17,7 +28,7 @@ class AdaptiveDetector:
 
     def has_motion(self, frame):
         """Returns True if significant motion is detected in the frame.
-           Frame is downscaled to avoid CPU bottleneck at higher resolutions.
+        Frame is downscaled to avoid CPU bottleneck at higher resolutions.
         """
         h, w = frame.shape[:2]
         scale = min(1.0, self.motion_target_width / w)

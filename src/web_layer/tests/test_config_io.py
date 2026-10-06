@@ -37,7 +37,9 @@ class TestAtomicWriteJson:
         atomic_write_json(path, {"k": 1})
         assert not path.with_suffix(path.suffix + ".tmp").exists()
 
-    def test_simulated_crash_leaves_original_intact(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_simulated_crash_leaves_original_intact(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """If ``os.replace`` never fires, the live config stays valid."""
         path = tmp_path / "rules.json"
         original = {"rules": ["original"]}

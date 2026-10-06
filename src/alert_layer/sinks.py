@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
-import threading
-import requests
 import os
+import threading
 from pathlib import Path
-from dotenv import load_dotenv
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+import requests
+from dotenv import load_dotenv
 
 if TYPE_CHECKING:
     from logic_layer.rule_evaluator import TriggeredAlert
@@ -26,6 +27,7 @@ class Sink(Protocol):
 # ---------------------------------------------------------------------------
 # ConsoleSink
 # ---------------------------------------------------------------------------
+
 
 class ConsoleSink:
     """
@@ -51,6 +53,7 @@ class ConsoleSink:
 # ---------------------------------------------------------------------------
 # JsonlSink
 # ---------------------------------------------------------------------------
+
 
 class JsonlSink:
     """
@@ -95,6 +98,7 @@ class JsonlSink:
 # TelegramSink
 # ---------------------------------------------------------------------------
 
+
 class TelegramSink:
     """
     Pushes a notification to a Telegram chat, routed by the alert's severity.
@@ -134,7 +138,7 @@ class TelegramSink:
     def deliver(self, alert: "TriggeredAlert") -> None:
         if self.bypass:
             return
-        
+
         if alert.severity == "low":
             return
 
@@ -159,9 +163,7 @@ class TelegramSink:
         """Build a plain-text notification body from the alert payload."""
         snapshots = alert.threat_snapshots
         classes = sorted({s.get("class_name", "unknown") for s in snapshots})
-        zones = sorted(
-            {z for s in snapshots for z in s.get("active_zones", [])}
-        )
+        zones = sorted({z for s in snapshots for z in s.get("active_zones", [])})
 
         lines = [
             f"{alert.severity.value.upper()} DETECTION",
@@ -177,4 +179,3 @@ class TelegramSink:
 
     def close(self) -> None:
         self._session.close()
-

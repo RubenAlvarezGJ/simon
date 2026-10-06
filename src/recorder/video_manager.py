@@ -46,7 +46,7 @@ class RetentionConfig:
     """
 
     footage_path: str | Path = "footage"
-    max_bytes: Optional[int] = 10 * 1024 ** 3
+    max_bytes: Optional[int] = 10 * 1024**3
     ttl_seconds: Optional[float] = 24 * 3600
     sweep_interval_seconds: float = 60.0
     glob_pattern: str = "cam_*.mkv"
@@ -82,9 +82,7 @@ class VideoManager:
         if self._thread is not None:
             raise RuntimeError("VideoManager is already running.")
         self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._run, name="VideoManager", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="VideoManager", daemon=True)
         self._thread.start()
 
     def stop(self, timeout: float = 5.0) -> None:

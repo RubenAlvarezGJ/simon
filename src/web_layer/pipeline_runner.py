@@ -6,14 +6,14 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import cv2
 
 from alert_layer.dispatcher import AlertDispatcher
-from alert_layer.sinks import ConsoleSink, JsonlSink, TelegramSink, Sink
+from alert_layer.sinks import ConsoleSink, JsonlSink, Sink, TelegramSink
 from logic_layer.rule_evaluator import RuleEvaluator
 from logic_layer.spatial_engine import SpatialEngine
 from logic_layer.state_manager import ActiveThreats
@@ -89,9 +89,9 @@ class PipelineRunner:
         device: str | None = None,
         jpeg_quality: int = 80,
         drop_frames_if_full: bool = True,
-        detector_factory: Optional[DetectorFactory] = None,
-        pipeline_factory: Optional[Callable[[Any], Any]] = None,
-        extra_sinks: Optional[list[Sink]] = None,
+        detector_factory: DetectorFactory | None = None,
+        pipeline_factory: Callable[[Any], Any] | None = None,
+        extra_sinks: list[Sink] | None = None,
     ) -> None:
         self._state = state
         self._source = source
@@ -100,23 +100,21 @@ class PipelineRunner:
         self._jsonl_path = jsonl_path
         self._jpeg_quality = jpeg_quality
 
-        self._detector_factory = detector_factory or _default_detector_factory(
-            model_path, device
-        )
+        self._detector_factory = detector_factory or _default_detector_factory(model_path, device)
         self._pipeline_factory = pipeline_factory or _default_pipeline_factory(
             source, drop_frames_if_full
         )
         self._extra_sinks: list[Sink] = list(extra_sinks or [])
 
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._started_event = threading.Event()
-        self._fatal_error: Optional[BaseException] = None
+        self._fatal_error: BaseException | None = None
 
         # Owned engines (created on the worker thread on start to avoid loading
         # CUDA / models on the FastAPI startup loop).
-        self._spatial_engine: Optional[SpatialEngine] = None
-        self._rule_evaluator: Optional[RuleEvaluator] = None
+        self._spatial_engine: SpatialEngine | None = None
+        self._rule_evaluator: RuleEvaluator | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -127,9 +125,7 @@ class PipelineRunner:
             raise RuntimeError("PipelineRunner is already running.")
         self._stop_event.clear()
         self._started_event.clear()
-        self._thread = threading.Thread(
-            target=self._run, name="PipelineRunner", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="PipelineRunner", daemon=True)
         self._thread.start()
         if wait_for_first_frame:
             self._started_event.wait(timeout=timeout)
@@ -148,7 +144,7 @@ class PipelineRunner:
         return self._thread is not None and self._thread.is_alive()
 
     @property
-    def fatal_error(self) -> Optional[BaseException]:
+    def fatal_error(self) -> BaseException | None:
         return self._fatal_error
 
     # ------------------------------------------------------------------

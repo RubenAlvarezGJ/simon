@@ -15,6 +15,7 @@ from logic_layer.state_manager import (
 # building full detection objects.
 # ---------------------------------------------------------------------------
 
+
 class MockDetections:
     """Minimal sv.Detections stand-in for unit testing."""
 
@@ -23,13 +24,15 @@ class MockDetections:
         tracker_ids: list[int],
         class_names: list[str],
         confidences: list[float] | None = None,
-        bboxes:      list[list[float]] | None = None,
+        bboxes: list[list[float]] | None = None,
     ):
-        self.tracker_id = np.array(tracker_ids, dtype=int) if tracker_ids else np.array([], dtype=int)
-        self.class_id   = None
+        self.tracker_id = (
+            np.array(tracker_ids, dtype=int) if tracker_ids else np.array([], dtype=int)
+        )
+        self.class_id = None
         self.confidence = np.array(confidences) if confidences else np.ones(len(tracker_ids))
-        self.xyxy       = np.array(bboxes) if bboxes else np.zeros((len(tracker_ids), 4))
-        self.data       = {"class_name": class_names} if class_names else {}
+        self.xyxy = np.array(bboxes) if bboxes else np.zeros((len(tracker_ids), 4))
+        self.data = {"class_name": class_names} if class_names else {}
 
 
 def empty_detections() -> MockDetections:
@@ -50,11 +53,10 @@ def make_detections(
     )
 
 
-
-
 # ===========================================================================
 # Test Cases
 # ===========================================================================
+
 
 class TestPendingDebounce(unittest.TestCase):
     """Objects must accumulate the required frame count before confirming."""
@@ -158,12 +160,12 @@ class TestCooldown(unittest.TestCase):
     def setUp(self):
         cfg = StateManagerConfig(
             confirm_frames=2,
-            cooldown_seconds=0.1,   # Short duration for fast test
+            cooldown_seconds=0.1,  # Short duration for fast test
         )
         self.registry = ActiveThreats(config=cfg)
         det = make_detections([5], ["handgun"])
         self.registry.update(det)
-        self.registry.update(det)   # Now CONFIRMED
+        self.registry.update(det)  # Now CONFIRMED
 
     def test_confirmed_transitions_to_cooldown_when_absent(self):
         self.registry.update(empty_detections())
@@ -178,7 +180,7 @@ class TestCooldown(unittest.TestCase):
 
     def test_expired_cooldown_purges_entry(self):
         self.registry.update(empty_detections())  # → COOLDOWN
-        time.sleep(0.15)                            # Exceed cooldown_seconds=0.1
+        time.sleep(0.15)  # Exceed cooldown_seconds=0.1
         self.registry.update(empty_detections())  # Purge check fires
         self.assertIsNone(self.registry.get_by_tracker_id(5))
 
@@ -203,7 +205,7 @@ class TestRevival(unittest.TestCase):
         self.registry = ActiveThreats(config=self.cfg)
         det = make_detections([7], ["handgun"])
         self.registry.update(det)
-        self.registry.update(det)   # → CONFIRMED
+        self.registry.update(det)  # → CONFIRMED
         self.registry.update(empty_detections())  # → COOLDOWN
 
     def test_reentry_revives_to_confirmed(self):
@@ -231,10 +233,10 @@ class TestRevival(unittest.TestCase):
         det = make_detections([8], ["handgun"])
         registry.update(det)
         registry.update(det)
-        registry.update(det)        # → CONFIRMED
+        registry.update(det)  # → CONFIRMED
         registry.update(empty_detections())  # → COOLDOWN
 
-        registry.update(det)        # Re-entry → PENDING (not revived)
+        registry.update(det)  # Re-entry → PENDING (not revived)
         self.assertEqual(registry.get_by_tracker_id(8).status, ThreatStatus.PENDING)
 
 
@@ -308,8 +310,16 @@ class TestThreatStateProperties(unittest.TestCase):
         registry = ActiveThreats(config=cfg)
         registry.update(make_detections([1], ["handgun"]))
         d = registry.get_by_tracker_id(1).to_dict()
-        for key in ("tracker_id", "class_name", "status",
-                    "frame_count", "confidence", "bbox", "age_seconds", "alert_fired"):
+        for key in (
+            "tracker_id",
+            "class_name",
+            "status",
+            "frame_count",
+            "confidence",
+            "bbox",
+            "age_seconds",
+            "alert_fired",
+        ):
             self.assertIn(key, d, f"Missing key: {key}")
         self.assertNotIn("is_critical", d)
 

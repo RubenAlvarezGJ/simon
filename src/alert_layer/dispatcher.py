@@ -20,7 +20,7 @@ class AlertDispatcher:
     Usage (context manager - matches VideoPipeline)::
 
         with AlertDispatcher(sinks) as dispatcher:
-            dispatcher.dispatch(alerts)   # called once per frame
+            dispatcher.dispatch(alerts)  # called once per frame
 
     Args:
         sinks:        Ordered iterable of Sink objects. Each alert is
@@ -96,7 +96,8 @@ class AlertDispatcher:
             self._thread.join(timeout=timeout)
             if self._thread.is_alive():
                 logger.warning(
-                    "AlertDispatcher: worker did not exit within %.1fs", timeout,
+                    "AlertDispatcher: worker did not exit within %.1fs",
+                    timeout,
                 )
             self._thread = None
 
@@ -135,8 +136,7 @@ class AlertDispatcher:
             return
         if not self._running or self._stop_event.is_set():
             logger.warning(
-                "AlertDispatcher: dispatch() called while not running; "
-                "dropping %d alert(s).",
+                "AlertDispatcher: dispatch() called while not running; dropping %d alert(s).",
                 len(alerts),
             )
             return

@@ -6,10 +6,10 @@ import pytest
 from alert_layer.dispatcher import AlertDispatcher
 from logic_layer.rule_evaluator import TriggeredAlert
 
-
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def make_alert(rule_name: str = "TestRule", ids: list[int] | None = None) -> TriggeredAlert:
     return TriggeredAlert(
@@ -80,8 +80,8 @@ class CloseableSink:
 # Lifecycle
 # ===========================================================================
 
-class TestLifecycle:
 
+class TestLifecycle:
     def test_context_manager_starts_and_stops(self):
         with AlertDispatcher([]) as dispatcher:
             assert dispatcher.is_running is True
@@ -117,8 +117,8 @@ class TestLifecycle:
 # Dispatch behaviour
 # ===========================================================================
 
-class TestDispatch:
 
+class TestDispatch:
     def test_empty_list_is_noop(self):
         sink = RecordingSink()
         with AlertDispatcher([sink]) as dispatcher:
@@ -182,8 +182,8 @@ class TestDispatch:
 # Error isolation
 # ===========================================================================
 
-class TestSinkErrorIsolation:
 
+class TestSinkErrorIsolation:
     def test_failing_sink_does_not_kill_others(self):
         boom = BoomSink()
         ok = RecordingSink(expected=2)
@@ -214,8 +214,8 @@ class TestSinkErrorIsolation:
 # Queue full handling
 # ===========================================================================
 
-class TestQueueFull:
 
+class TestQueueFull:
     def test_drop_on_full_increments_dropped_counter(self):
         blocker = BlockingSink()
         dispatcher = AlertDispatcher([blocker], queue_size=2, drop_on_full=True)

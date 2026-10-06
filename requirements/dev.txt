@@ -9,6 +9,9 @@ pytest-asyncio==1.3.0
 # dev install cannot run the suite.
 httpx==0.28.1
 
+# formatting
+ruff==0.16.7
+
 # roboflow is NOT installed here. scripts/ (git-ignored, dev-only) needs it,
 # but roboflow==1.3.6 hard-pins opencv-python-headless==4.10.0.84, which
 # conflicts with the ==4.13.0.92 pin in base.txt -- two == pins on the same

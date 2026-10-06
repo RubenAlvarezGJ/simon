@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class StateManagerConfig:
     """
@@ -23,7 +24,7 @@ class StateManagerConfig:
 
     Args:
         confirm_frames:        Consecutive frames required to confirm a detection.
-        
+
         cooldown_seconds:      Duration (seconds) a lost ID is retained in
                                COOLDOWN before being purged. Prevents re-alerting
                                on the same physical object re-entering frame.
@@ -31,20 +32,23 @@ class StateManagerConfig:
                                directly to CONFIRMED, skipping debounce. Safe
                                to enable when tracker ID stability is high.
     """
-    confirm_frames: int   = 3
-    cooldown_seconds:        float = 8.0
-    revive_on_reentry:       bool  = True
+
+    confirm_frames: int = 3
+    cooldown_seconds: float = 8.0
+    revive_on_reentry: bool = True
 
 
 # ------------------------------------------------------------------
 # Data Structures
 # ------------------------------------------------------------------
 
+
 class ThreatStatus(Enum):
     """Lifecycle states for a tracked object within the registry."""
-    PENDING   = auto()   # Visible, accumulating debounce frames
-    CONFIRMED = auto()   # Debounce threshold met — active threat
-    COOLDOWN  = auto()   # No longer visible, awaiting expiry before deletion
+
+    PENDING = auto()  # Visible, accumulating debounce frames
+    CONFIRMED = auto()  # Debounce threshold met — active threat
+    COOLDOWN = auto()  # No longer visible, awaiting expiry before deletion
 
 
 @dataclass
@@ -70,17 +74,18 @@ class ThreatState:
                         notification is emitted. Prevents duplicate alerts on the
                         same object ID within its active lifetime.
     """
-    tracker_id:    int
-    class_name:    str
-    status:        ThreatStatus
-    frame_count:   int
-    confidence:    float
-    bbox:          np.ndarray
-    first_seen_at: float       = field(default_factory=time.monotonic)
-    last_seen_at:  float       = field(default_factory=time.monotonic)
+
+    tracker_id: int
+    class_name: str
+    status: ThreatStatus
+    frame_count: int
+    confidence: float
+    bbox: np.ndarray
+    first_seen_at: float = field(default_factory=time.monotonic)
+    last_seen_at: float = field(default_factory=time.monotonic)
     cooldown_start: Optional[float] = None
-    alert_fired:   bool        = False
-    active_zones:  list[str]   = field(default_factory=list)
+    alert_fired: bool = False
+    active_zones: list[str] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Convenience properties
@@ -90,14 +95,14 @@ class ThreatState:
     def age_seconds(self) -> float:
         """Wall-clock seconds since this object was first detected."""
         return time.monotonic() - self.first_seen_at
-    
+
     @property
     def cooldown_elapsed(self) -> float:
         """Seconds elapsed since cooldown began. 0.0 if not in cooldown."""
         if self.cooldown_start is None:
             return 0.0
         return time.monotonic() - self.cooldown_start
- 
+
     @property
     def is_cooldown_expired(self, cooldown_duration: float = 8.0) -> bool:
         """
@@ -110,23 +115,24 @@ class ThreatState:
     def to_dict(self) -> dict:
         """Serialisable snapshot for logging, the Agentic Layer, or debug UIs."""
         return {
-            "tracker_id":    self.tracker_id,
-            "class_name":    self.class_name,
-            "status":        self.status.name,
-            "frame_count":   self.frame_count,
-            "confidence":    round(self.confidence, 4),
-            "bbox":          self.bbox.tolist(),
-            "age_seconds":   round(self.age_seconds, 2),
-            "alert_fired":   self.alert_fired,
-            "active_zones":  list(self.active_zones),
+            "tracker_id": self.tracker_id,
+            "class_name": self.class_name,
+            "status": self.status.name,
+            "frame_count": self.frame_count,
+            "confidence": round(self.confidence, 4),
+            "bbox": self.bbox.tolist(),
+            "age_seconds": round(self.age_seconds, 2),
+            "alert_fired": self.alert_fired,
+            "active_zones": list(self.active_zones),
             "first_seen_at": self.first_seen_at,
-            "last_seen_at":  self.last_seen_at,
+            "last_seen_at": self.last_seen_at,
         }
 
 
 # ------------------------------------------------------------------
 # ActiveThreats Registry
 # ------------------------------------------------------------------
+
 
 class ActiveThreats:
     """
@@ -162,11 +168,11 @@ class ActiveThreats:
                           If sv.Detections already carries class names in
                           detections.data["class_name"], this can be omitted.
         """
-        self._config:            StateManagerConfig       = config
-        self._class_names:       dict[int, str]           = class_names or {}
-        self._registry:          dict[int, ThreatState]   = {}
-        self._newly_confirmed:   list[ThreatState]        = []
-        self._confirm_frames:    int                      = config.confirm_frames
+        self._config: StateManagerConfig = config
+        self._class_names: dict[int, str] = class_names or {}
+        self._registry: dict[int, ThreatState] = {}
+        self._newly_confirmed: list[ThreatState] = []
+        self._confirm_frames: int = config.confirm_frames
 
     # ------------------------------------------------------------------
     # API
@@ -190,9 +196,7 @@ class ActiveThreats:
         for idx, tracker_id in enumerate(active_ids):
             class_name = self._resolve_class_name(detections, idx)
             confidence = (
-                float(detections.confidence[idx])
-                if detections.confidence is not None
-                else 0.0
+                float(detections.confidence[idx]) if detections.confidence is not None else 0.0
             )
             bbox = detections.xyxy[idx]
 
@@ -201,7 +205,6 @@ class ActiveThreats:
             else:
                 self._advance_entry(tracker_id, class_name, confidence, bbox)
 
-        
         # Process IDs absent this frame
         self._process_absent_ids(set(active_ids))
 
@@ -210,10 +213,7 @@ class ActiveThreats:
         All currently CONFIRMED threats.
         Primary input for spatial_engine.py and rule_evaluator.py.
         """
-        return [
-            s for s in self._registry.values()
-            if s.status == ThreatStatus.CONFIRMED
-        ]
+        return [s for s in self._registry.values() if s.status == ThreatStatus.CONFIRMED]
 
     def get_newly_confirmed(self) -> list[ThreatState]:
         """
@@ -269,9 +269,9 @@ class ActiveThreats:
     def _create_entry(
         self,
         tracker_id: int,
-        class_name:  str,
-        confidence:  float,
-        bbox:        np.ndarray,
+        class_name: str,
+        confidence: float,
+        bbox: np.ndarray,
     ) -> None:
         """
         Register a new tracker ID.
@@ -281,12 +281,12 @@ class ActiveThreats:
         (i.e. threshold == 1).
         """
         entry = ThreatState(
-            tracker_id  = tracker_id,
-            class_name  = class_name,
-            status      = ThreatStatus.PENDING,
-            frame_count = 1,
-            confidence  = confidence,
-            bbox        = bbox.copy(),
+            tracker_id=tracker_id,
+            class_name=class_name,
+            status=ThreatStatus.PENDING,
+            frame_count=1,
+            confidence=confidence,
+            bbox=bbox.copy(),
         )
         self._registry[tracker_id] = entry
 
@@ -296,33 +296,35 @@ class ActiveThreats:
         else:
             logger.debug(
                 "PENDING   | ID %-4d | %-15s | conf=%.2f",
-                tracker_id, class_name, confidence,
+                tracker_id,
+                class_name,
+                confidence,
             )
 
     def _advance_entry(
         self,
         tracker_id: int,
-        class_name:  str,
-        confidence:  float,
-        bbox:        np.ndarray,
+        class_name: str,
+        confidence: float,
+        bbox: np.ndarray,
     ) -> None:
         """Update an existing registry entry based on its current status."""
-        entry              = self._registry[tracker_id]
+        entry = self._registry[tracker_id]
         entry.last_seen_at = time.monotonic()
-        entry.confidence   = confidence
-        entry.bbox         = bbox.copy()
+        entry.confidence = confidence
+        entry.bbox = bbox.copy()
         # Guard against rare ByteTrack re-ID class swaps on crowded scenes
-        entry.class_name   = class_name
- 
+        entry.class_name = class_name
+
         if entry.status == ThreatStatus.COOLDOWN:
             self._revive_entry(entry)
- 
+
         elif entry.status == ThreatStatus.PENDING:
             entry.frame_count += 1
             threshold = self._confirm_frames
             if entry.frame_count >= threshold:
                 self._confirm_entry(entry)
- 
+
         elif entry.status == ThreatStatus.CONFIRMED:
             # Continue incrementing for dwell-time tracking
             entry.frame_count += 1
@@ -333,41 +335,45 @@ class ActiveThreats:
         self._newly_confirmed.append(entry)
         logger.info(
             "CONFIRMED | ID %-4d | %-15s | conf=%.2f | frames=%d",
-            entry.tracker_id, entry.class_name,
-            entry.confidence, entry.frame_count,
+            entry.tracker_id,
+            entry.class_name,
+            entry.confidence,
+            entry.frame_count,
         )
 
     def _revive_entry(self, entry: ThreatState) -> None:
         """
         Restore a COOLDOWN entry to CONFIRMED when it reappears in frame.
- 
+
         Skips the debounce threshold because we already verified this object.
         The original alert_fired flag is preserved, the alert dispatcher
         should decide whether a re-entry warrants a second notification.
         """
         if self._config.revive_on_reentry:
-            entry.status         = ThreatStatus.CONFIRMED
+            entry.status = ThreatStatus.CONFIRMED
             entry.cooldown_start = None
-            entry.frame_count   += 1
+            entry.frame_count += 1
             logger.info(
                 "REVIVED   | ID %-4d | %-15s | reappeared after cooldown",
-                entry.tracker_id, entry.class_name,
+                entry.tracker_id,
+                entry.class_name,
             )
         else:
             # Treat re-entry as a fresh sighting requiring full debounce
-            entry.status         = ThreatStatus.PENDING
+            entry.status = ThreatStatus.PENDING
             entry.cooldown_start = None
-            entry.frame_count    = 1
-            entry.alert_fired    = False
+            entry.frame_count = 1
+            entry.alert_fired = False
             logger.debug(
                 "RE-PENDING| ID %-4d | %-15s | revive_on_reentry=False",
-                entry.tracker_id, entry.class_name,
+                entry.tracker_id,
+                entry.class_name,
             )
 
     def _process_absent_ids(self, active_set: set[int]) -> None:
         """
         Transition or purge all registry entries not present this frame.
- 
+
         Transition rules:
           PENDING   -> DELETE  (never confirmed; discard silently)
           CONFIRMED -> COOLDOWN (start expiry clock)
@@ -375,36 +381,39 @@ class ActiveThreats:
         """
         to_delete: list[int] = []
         now = time.monotonic()
- 
+
         for tracker_id, entry in self._registry.items():
             if tracker_id in active_set:
                 continue
- 
+
             if entry.status == ThreatStatus.PENDING:
                 to_delete.append(tracker_id)
                 logger.debug(
                     "DISCARDED | ID %-4d | %-15s | never reached confirm threshold",
-                    tracker_id, entry.class_name,
+                    tracker_id,
+                    entry.class_name,
                 )
- 
+
             elif entry.status == ThreatStatus.CONFIRMED:
-                entry.status         = ThreatStatus.COOLDOWN
+                entry.status = ThreatStatus.COOLDOWN
                 entry.cooldown_start = now
                 logger.info(
                     "COOLDOWN  | ID %-4d | %-15s | last_seen=%.1fs ago",
-                    tracker_id, entry.class_name,
+                    tracker_id,
+                    entry.class_name,
                     now - entry.last_seen_at,
                 )
- 
+
             elif entry.status == ThreatStatus.COOLDOWN:
                 if entry.cooldown_elapsed >= self._config.cooldown_seconds:
                     to_delete.append(tracker_id)
                     logger.info(
                         "PURGED    | ID %-4d | %-15s | cooldown expired after %.1fs",
-                        tracker_id, entry.class_name,
+                        tracker_id,
+                        entry.class_name,
                         self._config.cooldown_seconds,
                     )
- 
+
         for tracker_id in to_delete:
             del self._registry[tracker_id]
 

@@ -1,7 +1,7 @@
+import logging
 import queue
 import threading
 import time
-import logging
 from collections import deque
 from typing import Any, Self
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class DetectionEngine:
     """
     Pulls frames from an input queue, runs GPU inference via AdaptiveDetector class,
-    and pushes (annotated_frame, detections) result tuples onto an output queue on a 
+    and pushes (annotated_frame, detections) result tuples onto an output queue on a
     dedicated background thread.
 
     This decouples the GPU from both the frame reader (I/O-bound) and the display
@@ -67,7 +67,7 @@ class DetectionEngine:
 
         # Diagnostics
         self._frames_processed: int = 0
-        self._frames_skipped: int = 0   # result dropped because output queue full
+        self._frames_skipped: int = 0  # result dropped because output queue full
         self._total_inference_time: float = 0.0
 
     # ------------------------------------------------------------------
@@ -156,11 +156,11 @@ class DetectionEngine:
 
         while not self._stop_event.is_set():
             try:
-               frame = self._input_queue.get(block=True, timeout=0.1)
+                frame = self._input_queue.get(block=True, timeout=0.1)
             except queue.Empty:
                 # Timeout exceeded, try again.
                 continue
- 
+
             if frame is None:
                 # Sentinal value detected.
                 logger.info("DetectionEngine: end-of-stream sentinel received")
@@ -229,8 +229,7 @@ class DetectionEngine:
         except queue.Full:
             self._frames_skipped += 1
             logger.debug(
-                "DetectionEngine: result dropped (output queue full). "
-                "total_skipped=%d",
+                "DetectionEngine: result dropped (output queue full). total_skipped=%d",
                 self._frames_skipped,
             )
 
